@@ -1,0 +1,5 @@
+torch==2.1.2 # Dans le sujet entre 2.0 <2.2
+torchvision
+numpy
+gensim
+OpenNMT-py
