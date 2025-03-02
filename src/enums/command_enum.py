@@ -4,6 +4,7 @@ class CommandType(Enum):
     # ********************* Commandes pour la collecte de données
     DOWNLOAD_FROM_URL = "download_from_url"
     EXTRACT_FROM_TAR = "extract_from_tar"
+    DOWNLOAD_AND_EXTRACT_FROM_TAR = "download_and_extract_from_tar"
     
     # ********************* Commandes pour le prétraitement
     TOKENIZE = "tokenize"
