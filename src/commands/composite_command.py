@@ -13,7 +13,5 @@ class CompositeCommand(Command):
 
     def execute(self):
         """Exécute chaque commande dans l'ordre."""
-        print("🛠️ Début de l'exécution des commandes")
         for command in self.commands:
             command.execute()
-        print("✅ Toutes les commandes ont été exécutées.")
