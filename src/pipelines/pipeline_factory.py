@@ -13,7 +13,7 @@ class PipelineFactory:
     open_nmt_cmd_factory = OpenNMTCommandFactory()
     corpus_cmd_factory = CorpusConstructionCommandFactory()
 
-    # ********************* Pipeline réutilisable
+    # ********************* Pipelines réutilisables
         
     @staticmethod
     def get_pipeline_for_corpuses_construction_from_tokenized_file(
@@ -60,6 +60,8 @@ class PipelineFactory:
         
         return pipeline
 
+
+    # ********************* Pipelines spécifiques
 
     @staticmethod
     def get_pipeline_i1(n_sample: int = 1000) -> Pipeline:

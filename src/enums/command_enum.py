@@ -17,6 +17,14 @@ class CommandType(Enum):
 
     CORPUS_SPLITTING_INTO_TRAIN_DEV_TEST_CORPUSES = "corpus_splitting_into_train_dev_test_corpuses"
 
+    # ********************* Commandes pour la partie Moses
+
+    CLONE_MOSES = "clone_moses"
+    TRAIN_TRUECASER_MODEL = "train_truecaser_model"
+    TRUE_CASING = "true_casing"
+
+    SOLVE_DEPENDENCIES_AND_TRAIN_TRUECASER_MODEL = "solve_dependencies_and_train_truecaser_model"
+
     # ********************* Commandes pour les configurations
     YAML_CONFIG = "yaml_config"
     
