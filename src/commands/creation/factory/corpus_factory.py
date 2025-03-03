@@ -1,5 +1,6 @@
 from src.enums.command_enum import CommandType
 from src.commands.creation.factory.command_factory import CommandFactory
+from src.utils.helpers import pathExists
 
 class CorpusConstructionCommandFactory(CommandFactory):
     """Factory pour la création des commandes concernant la construction de corpus."""
@@ -46,23 +47,29 @@ class CorpusConstructionCommandFactory(CommandFactory):
                 ])
 
             commands = [
-                # Train
-                self.create_command(
+                # Train + Vérifier si le fichier existe déjà
+                self.build_command(f"echo \"📢 Le fichier {kwargs['output_file_for_train_corpus']} existe déjà. Il n'est pas nécessaire de le recréer\"")
+                if pathExists(kwargs["output_file_for_train_corpus"])
+                else self.create_command(
                     CommandType.EXTRACT_FIRST_N_LINES,
                     nb_lines_to_extract=kwargs["nb_lines_to_extract_for_train_corpus"],
                     file_path=kwargs["tokenized_corpus_path"],
                     output_file=kwargs["output_file_for_train_corpus"]
                 ),
-                # Dev
-                self.create_command(
+                # Dev + Vérifier si le fichier existe déjà
+                self.build_command(f"echo \"📢 Le fichier {kwargs['output_file_for_dev_corpus']} existe déjà. Il n'est pas nécessaire de le recréer\"")
+                if pathExists(kwargs["output_file_for_dev_corpus"])
+                else self.create_command(
                     CommandType.EXTRACT_N_RANDOM_LINES_FROM_STARTING_POINT,
                     starting_point=kwargs["starting_point"],
                     file_path=kwargs["tokenized_corpus_path"],
                     nb_lines_to_extract=kwargs["nb_lines_to_extract_for_dev_corpus"],
                     output_file=kwargs["output_file_for_dev_corpus"]
                 ),
-                # Test
-                self.create_command(
+                # Test + Vérifier si le fichier existe déjà
+                self.build_command(f"echo \"📢 Le fichier {kwargs['output_file_for_test_corpus']} existe déjà. Il n'est pas nécessaire de le recréer\"")
+                if pathExists(kwargs["output_file_for_test_corpus"])
+                else self.create_command(
                     CommandType.EXTRACT_N_RANDOM_LINES_WHICH_ARE_NOT_IN_GIVEN_FILE,
                     starting_point=kwargs["starting_point"],
                     file_path=kwargs["tokenized_corpus_path"],

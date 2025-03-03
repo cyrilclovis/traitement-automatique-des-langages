@@ -10,7 +10,10 @@ class ShellCommand(Command):
         self.command = command
 
     def execute(self):
-        print(f"🔹 Exécution : {self.command}")
+
+        # Evite d'afficher deux fois la meme information
+        if self.command.split()[0] != "echo":
+            print(f"🔹 Exécution : {self.command}")
 
         def stream_output(pipe, is_error=False):
             """Lit et affiche la sortie du processus en temps réel."""
