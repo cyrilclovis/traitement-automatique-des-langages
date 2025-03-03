@@ -22,6 +22,7 @@ class CommandType(Enum):
     CLONE_MOSES = "clone_moses"
     TRAIN_TRUECASER_MODEL = "train_truecaser_model"
     TRUE_CASING = "true_casing"
+    CLEAN_CORPUS = "clean_corpus"
 
     SOLVE_DEPENDENCIES_AND_TRAIN_TRUECASER_MODEL = "solve_dependencies_and_train_truecaser_model"
 

@@ -2,7 +2,7 @@ from src.enums.command_enum import CommandType
 from src.commands.creation.factory.command_factory import CommandFactory
 from src.utils.helpers import pathExists
 
-class TrueCasingCommandFactory(CommandFactory):
+class MosesCommandFactory(CommandFactory):
     """Factory pour la création des commandes associées au dépot Moses."""
 
     def create_command(self, command_type: CommandType, **kwargs):
@@ -13,7 +13,7 @@ class TrueCasingCommandFactory(CommandFactory):
 
             if pathExists("./data/mosesdecoder"):
                 return self.build_command(f"echo \"📢 Le dépôt mosesdecoder existe déjà. Il n'est pas nécessaire de le recloner\"")
-            return self.build_command("git clone https://github.com/moses-smt/mosesdecoder.git ./data")
+            return self.build_command("git clone https://github.com/moses-smt/mosesdecoder.git ./data/mosesdecoder")
 
         elif command_type == CommandType.TRAIN_TRUECASER_MODEL:
             self.check_required_arguments(kwargs, ["model_path", "corpus_path"])
@@ -24,7 +24,13 @@ class TrueCasingCommandFactory(CommandFactory):
         elif command_type == CommandType.TRUE_CASING:
             self.check_required_arguments(kwargs, ["model_path", "input_file", "output_file"])
             return self.build_command(
-                f".data/mosesdecoder/scripts/recaser/truecase.perl --model {kwargs['model_path']} < {kwargs['input_file']} > {kwargs['output_file']}"
+                f"./data/mosesdecoder/scripts/recaser/truecase.perl --model {kwargs['model_path']} < {kwargs['input_file']} > {kwargs['output_file']}"
+            )
+        
+        elif command_type == CommandType.CLEAN_CORPUS:
+            self.check_required_arguments(kwargs, ["input_file", "lang1", "lang2", "output_file", "min_len", "max_len"])
+            return self.build_command(
+                f"./data/mosesdecoder/scripts/training/clean-corpus-n.perl {kwargs['input_file']} {kwargs['lang1']} {kwargs['lang2']} {kwargs['output_file']} {kwargs['min_len']} {kwargs['max_len']}"
             )
         
         # ********************* Commandes composées
