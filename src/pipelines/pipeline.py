@@ -21,6 +21,6 @@ class Pipeline(Command):
 
     def execute(self):
         """Exécute les commandes du composite dans le pipeline."""
-        print("🛠️ Début de l'exécution des commandes")
+        print("└─────────────────────────────> Nouvelle pipeline")
         self.commands.execute()
-        print("✅ Toutes les commandes ont été exécutées.")
+        print("─────────────────────────────────────────────────")

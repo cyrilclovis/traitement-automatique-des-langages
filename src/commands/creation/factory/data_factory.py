@@ -1,5 +1,6 @@
 from src.enums.command_enum import CommandType
 from src.commands.creation.factory.command_factory import CommandFactory
+from src.utils.helpers import pathExists
 
 class DataGatheringCommandFactory(CommandFactory):
     """Factory pour la création des commandes concernant la collecte de données."""
@@ -25,11 +26,15 @@ class DataGatheringCommandFactory(CommandFactory):
         elif command_type == CommandType.DOWNLOAD_AND_EXTRACT_FROM_TAR:
             self.check_required_arguments(kwargs, ["url", "dest_dir"])
 
-            file_path = kwargs["dest_dir"] + "/" +  kwargs["url"].split('/')[-1]
+            tar_gz_file_path = kwargs["dest_dir"] + "/" +  kwargs["url"].split('/')[-1]
+            folder_path = tar_gz_file_path[:-7] # Enlève l'extension ".tar.gz"
+
+            if pathExists(folder_path):
+                return self.build_command(f"echo \"📢 Le dossier {folder_path} existe déjà. Il n'est pas nécessaire de le retélécharger\"")
 
             commands = [
                 self.create_command(CommandType.DOWNLOAD_FROM_URL, **kwargs),
-                self.create_command(CommandType.EXTRACT_FROM_TAR, **dict(kwargs, file_path=file_path)),
+                self.create_command(CommandType.EXTRACT_FROM_TAR, **dict(kwargs, file_path=tar_gz_file_path)),
             ]
 
             return self.build_composite_command(commands)
@@ -38,7 +43,10 @@ class DataGatheringCommandFactory(CommandFactory):
             self.check_required_arguments(kwargs, ["url", "dest_dir"])
 
             zip_file_path = kwargs["dest_dir"] + "/" +  kwargs["url"].split('/')[-1]
-            output_path = zip_file_path[:-3] # Enlève l'extension "".gz"
+            output_path = zip_file_path[:-3] # Enlève l'extension ".gz"
+
+            if pathExists(output_path):
+                return self.build_command(f"echo \"📢 Le fichier {output_path} existe déjà. Il n'est pas nécessaire de le retélécharger\"")
 
             commands = [
                 self.create_command(CommandType.DOWNLOAD_FROM_URL, **kwargs),
