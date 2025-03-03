@@ -1,5 +1,6 @@
 from src.enums.command_enum import CommandType
 from src.commands.creation.factory.command_factory import CommandFactory
+from src.utils.helpers import pathExists
 
 class TrueCasingCommandFactory(CommandFactory):
     """Factory pour la création des commandes associées au dépot Moses."""
@@ -9,18 +10,21 @@ class TrueCasingCommandFactory(CommandFactory):
         # ********************* Commandes simples
 
         if command_type == CommandType.CLONE_MOSES:
-            return self.build_command("git clone https://github.com/moses-smt/mosesdecoder.git")
+
+            if pathExists("./data/mosesdecoder"):
+                return self.build_command(f"echo \"📢 Le dépôt mosesdecoder existe déjà. Il n'est pas nécessaire de le recloner\"")
+            return self.build_command("git clone https://github.com/moses-smt/mosesdecoder.git ./data")
 
         elif command_type == CommandType.TRAIN_TRUECASER_MODEL:
             self.check_required_arguments(kwargs, ["model_path", "corpus_path"])
             return self.build_command(
-                f"/content/mosesdecoder/scripts/recaser/train-truecaser.perl --model {kwargs['model_path']} --corpus {kwargs['corpus_path']}"
+                f"./data/mosesdecoder/scripts/recaser/train-truecaser.perl --model {kwargs['model_path']} --corpus {kwargs['corpus_path']}"
             )
 
         elif command_type == CommandType.TRUE_CASING:
             self.check_required_arguments(kwargs, ["model_path", "input_file", "output_file"])
             return self.build_command(
-                f"/content/mosesdecoder/scripts/recaser/truecase.perl --model {kwargs['model_path']} < {kwargs['input_file']} > {kwargs['output_file']}"
+                f".data/mosesdecoder/scripts/recaser/truecase.perl --model {kwargs['model_path']} < {kwargs['input_file']} > {kwargs['output_file']}"
             )
         
         # ********************* Commandes composées
