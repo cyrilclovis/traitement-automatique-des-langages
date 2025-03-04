@@ -1,2 +1,5 @@
+from src.pipelines.pipeline_factory import PipelineFactory
+
 if __name__ == "__main__":
-    print("Execution du main")
+    classic_pipeline = PipelineFactory.get_pipeline_i2()
+    classic_pipeline.execute()
