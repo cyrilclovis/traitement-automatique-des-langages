@@ -12,6 +12,7 @@ class CommandType(Enum):
     # ********************* Commandes pour les créations de corpus
 
     EXTRACT_FIRST_N_LINES = "extract_first_n_lines"
+    EXTRACT_FIRST_N_LINES_FROM_STARTING_POINT = "extract_first_n_lines_from_starting_point"
     EXTRACT_N_RANDOM_LINES_FROM_STARTING_POINT = "extract_n_random_lines_from_starting_point"
     EXTRACT_N_RANDOM_LINES_WHICH_ARE_NOT_IN_GIVEN_FILE = "extract_n_random_lines_which_are_not_in_given_file"
 

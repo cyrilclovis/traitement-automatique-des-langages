@@ -14,6 +14,12 @@ class MosesCommandFactory(CommandFactory):
             if pathExists("./data/mosesdecoder"):
                 return self.build_command(f"echo \"📢 Le dépôt mosesdecoder existe déjà. Il n'est pas nécessaire de le recloner\"")
             return self.build_command("git clone https://github.com/moses-smt/mosesdecoder.git ./data/mosesdecoder")
+        
+        elif command_type == CommandType.TOKENIZE:
+            self.check_required_arguments(kwargs, ["lang", "input_file", "output_file"])
+            return self.build_command(
+                f"./data/mosesdecoder/scripts/tokenizer/tokenizer.perl -l {kwargs['lang']} < {kwargs['input_file']} > {kwargs['output_file']}"
+            )
 
         elif command_type == CommandType.TRAIN_TRUECASER_MODEL:
             self.check_required_arguments(kwargs, ["model_path", "corpus_path"])
