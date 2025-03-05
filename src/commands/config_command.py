@@ -97,6 +97,12 @@ class ConfigCommand(Command):
         }
 
         return key_mapping.get(required_field)
+    
+    def get_vocab_source_path(self):
+        return self.config["src_vocab"]
+    
+    def get_vocab_target_path(self):
+        return self.config["tgt_vocab"]
 
 
     def build(self) -> Dict:

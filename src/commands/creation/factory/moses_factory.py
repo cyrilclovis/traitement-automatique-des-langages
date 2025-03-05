@@ -5,17 +5,22 @@ from src.utils.helpers import pathExists
 class MosesCommandFactory(CommandFactory):
     """Factory pour la création des commandes associées au dépot Moses."""
 
+    def check_moses_repository(self):
+        """Vérifie si le dépôt mosesdecoder existe déjà."""
+        if not pathExists("./data/mosesdecoder"):
+            self.build_command("git clone https://github.com/moses-smt/mosesdecoder.git ./data/mosesdecoder").execute()
+
     def create_command(self, command_type: CommandType, **kwargs):
 
+        self.check_moses_repository()
+
+        # Vérifie l'existence du fichier de sortie avant de continuer
+        if self.pathExists_kwargs("output_file", **kwargs):
+            return self.build_already_exists_command(kwargs["output_file"])
+
         # ********************* Commandes simples
-
-        if command_type == CommandType.CLONE_MOSES:
-
-            if pathExists("./data/mosesdecoder"):
-                return self.build_command(f"echo \"📢 Le dépôt mosesdecoder existe déjà. Il n'est pas nécessaire de le recloner\"")
-            return self.build_command("git clone https://github.com/moses-smt/mosesdecoder.git ./data/mosesdecoder")
         
-        elif command_type == CommandType.TOKENIZE:
+        if command_type == CommandType.TOKENIZE:
             self.check_required_arguments(kwargs, ["lang", "input_file", "output_file"])
             return self.build_command(
                 f"./data/mosesdecoder/scripts/tokenizer/tokenizer.perl -l {kwargs['lang']} < {kwargs['input_file']} > {kwargs['output_file']}"
@@ -23,6 +28,11 @@ class MosesCommandFactory(CommandFactory):
 
         elif command_type == CommandType.TRAIN_TRUECASER_MODEL:
             self.check_required_arguments(kwargs, ["model_path", "corpus_path"])
+
+            # Vérifie l'existence du modèle
+            if self.pathExists(kwargs["model_path"]):
+                return self.build_already_exists_command(kwargs["model_path"])
+        
             return self.build_command(
                 f"./data/mosesdecoder/scripts/recaser/train-truecaser.perl --model {kwargs['model_path']} --corpus {kwargs['corpus_path']}"
             )
@@ -39,17 +49,5 @@ class MosesCommandFactory(CommandFactory):
                 f"./data/mosesdecoder/scripts/training/clean-corpus-n.perl {kwargs['input_file']} {kwargs['lang1']} {kwargs['lang2']} {kwargs['output_file']} {kwargs['min_len']} {kwargs['max_len']}"
             )
         
-        # ********************* Commandes composées
-
-        elif command_type == CommandType.SOLVE_DEPENDENCIES_AND_TRAIN_TRUECASER_MODEL:
-            self.check_required_arguments(kwargs, ["model_path", "corpus_path"])
-
-            commands = [
-                self.create_command(CommandType.CLONE_MOSES),
-                self.create_command(CommandType.TRAIN_TRUECASER_MODEL, **kwargs),
-            ]
-
-            return self.build_composite_command(commands)
-
         else:
             raise ValueError(f"Commande inconnue pour TrueCasing: {command_type}")

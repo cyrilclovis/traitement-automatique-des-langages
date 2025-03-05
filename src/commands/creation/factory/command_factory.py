@@ -6,6 +6,7 @@ from src.commands.command import Command
 from src.commands.config_command import ConfigCommand
 from src.commands.composite_command import CompositeCommand
 from src.commands.creation.command_builder import CommandBuilder
+from src.utils.helpers import pathExists
 
 class CommandFactory(ABC):
     """Classe abstraite pour créer des commandes spécifiques."""
@@ -16,13 +17,26 @@ class CommandFactory(ABC):
         raise NotImplementedError("Cette méthode doit être implémentée par une sous-classe.")
     
     def check_required_arguments(self, kwargs, required_args):
-        """Checks if all required arguments are present in kwargs."""
+        """Vérifie la présence des arguments nécessaires dans kwargs."""
         missing_args = [arg for arg in required_args if arg not in kwargs or kwargs[arg] is None]
         
         if missing_args:
             raise ValueError(f"⚠️ Les arguments suivantes sont absents ou null: {', '.join(missing_args)}")
+        
+    def pathExists_kwargs(self, key: str, **kwargs):
+        """Vérifie l'existence d'un fichier ou d'un dossier"""
+        if key in kwargs:
+            path_to_check = kwargs[key]
+            return pathExists(path_to_check)
+        return False
+    
+    def pathExists(self, key: str):
+        return pathExists(key)
 
     # ****** Les différents type de commande que factory peut renvoyer
+    def build_already_exists_command(self, already_exists_path: str):
+        """Construit la commande permettant d'afficher sur le terminal l'existence d'un fichier"""
+        return self.build_command(f"echo \"📢 {already_exists_path} existe déjà.\"")
 
     def build_command(self, base_command: str, **kwargs):
         """Crée une commande en appelant la méthode de CommandBuilder."""

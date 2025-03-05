@@ -25,8 +25,6 @@ class CommandType(Enum):
     TRUE_CASING = "true_casing"
     CLEAN_CORPUS = "clean_corpus"
 
-    SOLVE_DEPENDENCIES_AND_TRAIN_TRUECASER_MODEL = "solve_dependencies_and_train_truecaser_model"
-
     # ********************* Commandes pour les configurations
     YAML_CONFIG = "yaml_config"
     
@@ -39,5 +37,7 @@ class CommandType(Enum):
     TRANSLATE = "translate"
 
     # ********************* Commandes pour l'évaluation
+
+    BLEU_SCORE = "bleu_score"
     
 

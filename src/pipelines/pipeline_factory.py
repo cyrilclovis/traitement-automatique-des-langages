@@ -1,5 +1,12 @@
-from typing import List, Dict, Optional
+######## Ce fichier regroupe les pipelines de deux types: Réutilisables et spécifiques
+#### Comme ce fichier est assez long, voici une tables des matières des principales pipelines
 
+# Faites CTrl + f et rechercher le nom pour voir la pipeline correspondante
+    # tokenisation
+    # truecase and cleaning
+    # use openmt
+
+from typing import List, Dict, TypedDict, Tuple
 
 from src.pipelines.pipeline import Pipeline
 from src.enums.command_enum import CommandType
@@ -12,6 +19,15 @@ from src.commands.creation.factory.moses_factory import MosesCommandFactory
 
 from src.commands.config_command import ConfigCommand
 
+# Types:
+class CorpusSplits(TypedDict):
+    train: str
+    dev: str
+    test: str
+
+CorpusFilesByLang = Dict[str, CorpusSplits]  # Par exemple {"en": CorpusSplits, "fr": CorpusSplits}
+
+
 class PipelineFactory:
 
     # Ce sont les factory depuis lesquels on récupère les commandes qui nous intéressent
@@ -22,31 +38,55 @@ class PipelineFactory:
 
     # ********************* Pipelines réutilisables
     # Ce sont des pipelines qui regroupe des opérations que l'on sera amené à répéter; moyennant quoi, parfois, de nombreux paramètres doivent etre passés !
+
+    # tokenisation
+
     @staticmethod
-    def tokenize_all_files(raw_corpus_files_names: Dict[str, str], lang_code: str) -> tuple[Pipeline, dict]:
+    def tokenize_all_files(raw_corpus_splits: CorpusSplits, lang_code: str) -> Tuple[Pipeline, CorpusSplits]:
         """TODO"""
 
         pipeline = Pipeline()
 
-        tokensized_files_names = {}
+        # Génére les noms des fichiers tokenisés
+        tokensized_files_names: CorpusSplits = {
+            split: insert_before_extension(raw_corpus_splits[split], ".tok", lang_code)
+            for split in ["train", "dev", "test"]
+        }
 
-        for split in ["train", "dev", "test"]:
-
-            input_file = raw_corpus_files_names[split]
-            output_file = insert_before_extension(input_file, ".tok", lang_code)
-
+        # Ajoute les commandes au pipeline
+        for split, output_file in tokensized_files_names.items():
             pipeline.add_command_from_factory(
                 PipelineFactory.moses_cmd_factory,
                 CommandType.TOKENIZE,
-                input_file=input_file,
+                input_file=raw_corpus_splits[split],
                 output_file=output_file,
                 lang=lang_code
             )
 
-            tokensized_files_names[split] = output_file
-
         return pipeline, tokensized_files_names
-        
+
+    @staticmethod
+    def tokenize_all_corpora(raw_corpus_files_by_lang: CorpusFilesByLang, language_codes: List[str]) -> Tuple[Pipeline, CorpusFilesByLang]:
+
+        """
+        [PIPELINE I.2]
+        /!\ Cette méthode travaille sur les les corpus tokensiés. Par exmeple, pour 'en', j'ai train.tok, test.tok, dev.tok
+        """
+
+        pipeline = Pipeline()
+
+        tokenized_files_by_lang = {}
+
+        for lang_code in language_codes:
+            # Tokenisation des fichiers pour une langue
+            tokenize_pipeline, tokenized_files_names = PipelineFactory.tokenize_all_files(raw_corpus_files_by_lang[lang_code], lang_code)
+            pipeline.add_command(tokenize_pipeline)
+            tokenized_files_by_lang[lang_code] = tokenized_files_names
+
+        return pipeline, tokenized_files_by_lang
+
+    # TODO
+
     @staticmethod
     def split_tokenized_corpus_into_train_dev_test(
         folder_base_path: str,
@@ -55,7 +95,7 @@ class PipelineFactory:
         nb_lines_for_train_corpus: int = 10000,
         nb_lines_for_dev_corpus: int = 1000,
         nb_lines_for_test_corpus: int = 500
-    ) -> tuple[Pipeline, dict]:
+    ) -> Tuple[Pipeline, dict]:
         """
         Cette pipeline permet de :
         1. Télécharger et extraire un fichier compressé contenant un texte tokenisé.
@@ -104,8 +144,10 @@ class PipelineFactory:
             "test": test_file
         }
     
+    # truecase and cleaning
+    
     @staticmethod
-    def train_and_apply_truecasing(folder_base_path: str, code: str, corpora_files_names: dict) -> tuple[Pipeline, dict]:
+    def train_and_apply_truecasing(tokenized_corpus_splits: CorpusSplits, lang_code: str, folder_base_path: str) -> Tuple[Pipeline, CorpusSplits]:
         """
         Entraîne le modèle Truecaser et l'applique sur les corpus TRAIN, DEV et TEST.
 
@@ -117,44 +159,45 @@ class PipelineFactory:
         Returns:
             Pipeline: La pipeline mise à jour avec les étapes d'entraînement et d'application du Truecasing.
         """
-        model_path = f"{folder_base_path}/truecase-model.{code}"
+        model_path = f"{folder_base_path}/truecase-model.{lang_code}"
 
         # *********** On entraine le modèle
         pipeline = Pipeline().add_command_from_factory(
             PipelineFactory.moses_cmd_factory,
-            CommandType.SOLVE_DEPENDENCIES_AND_TRAIN_TRUECASER_MODEL,
+            CommandType.TRAIN_TRUECASER_MODEL,
             model_path=model_path,
-            corpus_path=corpora_files_names["train"]
+            corpus_path=tokenized_corpus_splits["train"]
         )
 
         # *********** Application du Truecasing sur TRAIN, DEV et TEST
-        truecased_files_names = {}
+        # Définition des noms de fichiers après le true casing
+        truecased_files_names: CorpusSplits = {
+            split: insert_before_extension(tokenized_corpus_splits[split], ".true", lang_code)
+            for split in ["train", "dev", "test"]
+        }
 
-        for split in ["train", "dev", "test"]:
-            output_file = insert_before_extension(corpora_files_names[split], ".true", code)
-
+        # Ajout des commandes au pipeline
+        for split, output_file in truecased_files_names.items():
             pipeline.add_command_from_factory(
                 PipelineFactory.moses_cmd_factory,
                 CommandType.TRUE_CASING,
                 model_path=model_path,
-                input_file=corpora_files_names[split],
+                input_file=tokenized_corpus_splits[split],
                 output_file=output_file
             )
-
-            # Enregistre le nom du fichier transformé dans le dictionnaire
-            truecased_files_names[split] = output_file
 
         return pipeline, truecased_files_names
 
     @staticmethod
-    def clean_truecased_files(truecased_files_names: dict, language_codes: List[str], min_len=1, max_len=80) -> tuple[Pipeline, dict]:
+    def clean_and_truecase_all_corpus(truecased_files_by_lang: CorpusFilesByLang, language_codes: List[str], min_len=1, max_len=80) -> Tuple[Pipeline, CorpusSplits]:
         # ***** Application du nettoyage sur TRAIN, DEV et TEST pour le couple situé dans language_codes.
         pipeline = Pipeline()
-        cleaned_files_names = {}
+        cleaned_files_names: CorpusSplits = {}
+        lang_src = language_codes[0]
 
         for split in ["train", "dev", "test"]:
 
-            input_file = remove_part_from_filename(truecased_files_names[split], f".{language_codes[1]}") # On enlève le ".{lang_code}", ici .en ou .fr (on enlève toujours le dernier)
+            input_file = remove_part_from_filename(truecased_files_by_lang[lang_src][split], f".{lang_src}") # On enlève le ".{lang_code}", ici .en ou .fr (on enlève toujours le dernier)
             output_file = f"{input_file}.clean"
 
             pipeline.add_command_from_factory(
@@ -174,72 +217,80 @@ class PipelineFactory:
         return pipeline, cleaned_files_names
     
     @staticmethod
-    def build_and_clean_corpus_pipeline(folder_base_path: str,
-                                        language_codes: List[str],
-                                        file_name_prefix: str=None,
-                                        raw_corpus_files: Optional[Dict[str, Dict[str, str]]] = None) -> tuple[Pipeline, dict]:
+    def truecase_and_clean_corpora_pipeline(tokenized_corpus_files_by_lang: CorpusFilesByLang, language_codes: List[str], folder_base_path: str
+                                           ) -> Tuple[Pipeline, CorpusSplits]:
         """
         [PIPELINE I.2]
+        TODO
         """
-
-        if file_name_prefix == None and raw_corpus_files == None:
-            raise ValueError("Le corpus doit être construit avec file_name_prefix ou (exclusif) fourni via raw_corpus_files .")
-
         pipeline = Pipeline()
+        truecased_files_by_lang: CorpusFilesByLang = {}
 
         for lang_code in language_codes:
 
-            # ***** Pour chaque lang_code, on met en place les corpus, on entraine le modèle à partir du corpus train, puis on l'applique sur tous nos corpus.
-            if file_name_prefix != None:
-                build_corpora_pipeline, corpora_files_names = PipelineFactory.split_tokenized_corpus_into_train_dev_test(folder_base_path, file_name_prefix, lang_code)
-                pipeline.add_command(build_corpora_pipeline)
-
-            if raw_corpus_files:
-                tokenize_pipeline, tokenized_files_names = PipelineFactory.tokenize_all_files(raw_corpus_files[lang_code], lang_code)
-                pipeline.add_command(tokenize_pipeline)
-                corpora_files_names = tokenized_files_names
-
-            train_and_apply_casing_pipeline, truecased_files_names = PipelineFactory.train_and_apply_truecasing(folder_base_path, lang_code, corpora_files_names)
+            # Applique le Truecasing après avoir entraîné le modèle
+            train_and_apply_casing_pipeline, truecased_files_names = PipelineFactory.train_and_apply_truecasing(tokenized_corpus_files_by_lang[lang_code], lang_code, folder_base_path)
             pipeline.add_command(train_and_apply_casing_pipeline)
 
+            # Construire le dictionnaire CorpusFilesByLang pour chaque langue
+            truecased_files_by_lang[lang_code] = truecased_files_names
+
         # ***** Application du nettoyage sur TRAIN, DEV et TEST (après avoir obtenu les corpus TRAIN, DEV, TEST nettoyés pour les langues contenus dans language_codes).
-        clean_truecased_pipeline, clean_truecased_files_names = PipelineFactory.clean_truecased_files(truecased_files_names, language_codes)
+        clean_truecased_pipeline, clean_truecased_files_names = PipelineFactory.clean_and_truecase_all_corpus(truecased_files_by_lang, language_codes)
         pipeline.add_command(clean_truecased_pipeline)
      
         return pipeline, clean_truecased_files_names
     
+    # use openmt
+    
     @staticmethod
-    def train_openmt_model_and_translate_pipeline(folder_base_path: str, clean_truecased_files_names: dict, language_codes: List[str], yaml_config_path: str, n_sample = 1000) -> Pipeline:
+    def train_openmt_model_and_translate_pipeline(clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str,  yaml_config_path: str, n_sample = 1000) -> Pipeline:
         """
         [PIPELINE I.2]
         """
-        folder_base_path += f"/{language_codes[0]}_{language_codes[1]}"
+        src_lang = language_codes[0]
+        dest_lang = language_codes[1]
+        folder_base_path += f"/{src_lang}_{language_codes[1]}"
 
         model_path = f"{folder_base_path}/run/model_step_{n_sample}.pt" # Chemin vers le modèle
-        src_path = f"{clean_truecased_files_names['test']}.{language_codes[0]}" # Chemin vers le fichier test true.cleaned (Attention, c'est la source !)
-        output_path = f"{folder_base_path}/run/pred_{n_sample}.txt"
+        source_translation_file = f"{clean_truecased_files_names['test']}.{src_lang}" #  (Attention, c'est la source !) => A partir de cela, on traduit
+        reference_translation_file = f"{clean_truecased_files_names['test']}.{dest_lang}" # (Attention, c'est la destination !) => On compare la traduction du modele avec ce fichier
+        model_translation = f"{folder_base_path}/run/pred_{n_sample}.txt"
+
+        config_command = ConfigCommand(folder_base_path, clean_truecased_files_names, language_codes, yaml_config_path)
 
         return Pipeline().add_command(
             # On crée le fichier YAML
-            ConfigCommand(folder_base_path, clean_truecased_files_names, language_codes, yaml_config_path)
+            config_command
         ).add_command_from_factory(
             # On construit le vocabulaire
             PipelineFactory.open_nmt_cmd_factory,
             CommandType.BUILD_VOCAB,
-            config_path=yaml_config_path, n_sample=n_sample
+            config_path=yaml_config_path,
+            src_vocab=config_command.get_vocab_source_path(),
+            tgt_vocab=config_command.get_vocab_target_path(),
+            n_sample=n_sample
         ).add_command_from_factory(
             # On fait l'entraiement
             PipelineFactory.open_nmt_cmd_factory,
             CommandType.TRAIN,
-            config_path=yaml_config_path
+            config_path=yaml_config_path,
+            model_path = model_path,
         ).add_command_from_factory(
             # On traduit
             PipelineFactory.open_nmt_cmd_factory,
             CommandType.TRANSLATE,
             model_path = model_path,
-            src_path = src_path,
-            output_path = output_path
+            src_path = source_translation_file,
+            output_path = model_translation
+        ).add_command_from_factory(
+            # On évalue
+            PipelineFactory.open_nmt_cmd_factory,
+            CommandType.BLEU_SCORE,
+            reference_file=reference_translation_file,
+            translation_file=model_translation
         )
+        
         
 
     # ********************* Pipelines spécifiques
@@ -293,7 +344,7 @@ class PipelineFactory:
 
         # I) On récupère les chemins vers les corpus donnés par le projet
 
-        raw_corpus_files = {
+        raw_corpus_files_by_lang: CorpusFilesByLang = {
             "en": {
                 "train": folder_base + "Europarl_train_10k.en",
                 "dev": folder_base + "Europarl_dev_1k.en",
@@ -306,19 +357,26 @@ class PipelineFactory:
             }
         }
 
-        # II) On prépare les données (en appliquant le true casing et le nettoyage pour les versions anglaises et francaises)
-        pipeline, clean_truecased_files_names = PipelineFactory.build_and_clean_corpus_pipeline(
-            folder_base_path=folder_base,
-            language_codes=language_codes,
-            raw_corpus_files=raw_corpus_files
-        )
+        # II) Tokenisation
+        pipeline, tokenized_corpus_files_by_lang = PipelineFactory.tokenize_all_corpora(
+            raw_corpus_files_by_lang=raw_corpus_files_by_lang,
+            language_codes=language_codes)
 
+        
+        # II) On prépare les données (en appliquant le true casing et le nettoyage pour les 2 versions (langue source, langue cible)
+        pipeline, clean_truecased_files_names = PipelineFactory.truecase_and_clean_corpora_pipeline(
+            tokenized_corpus_files_by_lang=tokenized_corpus_files_by_lang,
+            language_codes=language_codes,
+            folder_base_path=folder_base
+        )
+        
+        
         # III) On construit le vocabulaire, on entraine et on traduit
         pipeline.add_command(
             PipelineFactory.train_openmt_model_and_translate_pipeline(
-            folder_base_path=folder_base,
             clean_truecased_files_names=clean_truecased_files_names,
             language_codes=language_codes,
+            folder_base_path=folder_base,
             yaml_config_path=yaml_config_path
             )
         )
@@ -329,8 +387,8 @@ class PipelineFactory:
     @staticmethod
     def standard_pipeline() -> Pipeline:
 
-        
-        pipeline, clean_truecased_files_names = PipelineFactory.build_and_clean_corpus_pipeline(
+        """
+        pipeline, clean_truecased_files_names = PipelineFactory.truecase_and_clean_corpora_pipeline(
             folder_base_path="./data/europarl",
             file_name_prefix="Europarl",
             language_codes=["en", "fr"]
@@ -345,6 +403,8 @@ class PipelineFactory:
         )
 
         return Pipeline().add_command(pipeline).add_command(cmd2)
+        """
+        pass
     
 
 
