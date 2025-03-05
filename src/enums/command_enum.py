@@ -4,10 +4,14 @@ class CommandType(Enum):
     # ********************* Commandes pour la collecte de données
     DOWNLOAD_FROM_URL = "download_from_url"
     EXTRACT_FROM_TAR = "extract_from_tar"
+    EXTRACT_FROM_GZ = "extract_from_gz"
     EXTRACT_FROM_ZIP = "extract_from_zip"
 
     DOWNLOAD_AND_EXTRACT_FROM_TAR = "download_and_extract_from_tar"
+    DOWNLOAD_AND_EXTRACT_FROM_GZ = "download_and_extract_from_gz"
     DOWNLOAD_AND_EXTRACT_FROM_ZIP = "download_and_extract_from_zip"
+
+    REMOVE = "remove"
 
     # ********************* Commandes pour les créations de corpus
 

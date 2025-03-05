@@ -35,7 +35,7 @@ class CorpusConstructionCommandFactory(CommandFactory):
         elif command_type == CommandType.CORPUS_SPLITTING_INTO_TRAIN_DEV_TEST_CORPUSES:
             self.check_required_arguments(kwargs,
                 [
-                 "tokenized_corpus_path", # Commun à tous
+                 "corpus_path", # Commun à tous
                  
                  # Pour la mise en place du corpus d'entrainement
                  "nb_lines_to_extract_for_train_corpus",
@@ -59,14 +59,14 @@ class CorpusConstructionCommandFactory(CommandFactory):
                 self.create_command(
                     CommandType.EXTRACT_FIRST_N_LINES,
                     nb_lines_to_extract=kwargs["nb_lines_to_extract_for_train_corpus"],
-                    file_path=kwargs["tokenized_corpus_path"],
+                    file_path=kwargs["corpus_path"],
                     output_file=kwargs["output_file_for_train_corpus"]
                 ),
                 # Dev + Vérifier si le fichier existe déjà
                 self.create_command(
                     CommandType.EXTRACT_FIRST_N_LINES_FROM_STARTING_POINT,
                     starting_point=kwargs["starting_point_dev"],
-                    file_path=kwargs["tokenized_corpus_path"],
+                    file_path=kwargs["corpus_path"],
                     nb_lines_to_extract=kwargs["nb_lines_to_extract_for_dev_corpus"],
                     output_file=kwargs["output_file_for_dev_corpus"]
                 ),
@@ -74,7 +74,7 @@ class CorpusConstructionCommandFactory(CommandFactory):
                 self.create_command(
                     CommandType.EXTRACT_FIRST_N_LINES_FROM_STARTING_POINT,
                     starting_point=kwargs["starting_point_test"],
-                    file_path=kwargs["tokenized_corpus_path"],
+                    file_path=kwargs["corpus_path"],
                     nb_lines_to_extract=kwargs["nb_lines_to_extract_for_test_corpus"],
                     output_file=kwargs["output_file_for_test_corpus"],
                     exclude_file=kwargs["exclude_file"]

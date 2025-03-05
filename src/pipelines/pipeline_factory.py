@@ -2,6 +2,7 @@
 #### Comme ce fichier est assez long, voici une tables des matières des principales pipelines
 
 # Faites CTrl + f et rechercher le nom pour voir la pipeline correspondante
+    # split file into TRAIN, DEV, TEST corpora
     # tokenisation
     # truecase and cleaning
     # use openmt
@@ -39,6 +40,104 @@ class PipelineFactory:
     # ********************* Pipelines réutilisables
     # Ce sont des pipelines qui regroupe des opérations que l'on sera amené à répéter; moyennant quoi, parfois, de nombreux paramètres doivent etre passés !
 
+    # split file into TRAIN, DEV, TEST corpora
+
+    @staticmethod
+    def split_corpus_into_train_dev_test(
+        # fichier à partir du quel, on crée les corpus
+        corpus_file_path: str,
+        # Pour la création des noms de fichiers
+        folder_base_path: str,
+        file_name_prefix: str,
+        code: str,
+        # Pour la découpe
+        nb_lines_for_train_corpus: int,
+        nb_lines_for_dev_corpus: int,
+        nb_lines_for_test_corpus: int
+    ) -> Tuple[Pipeline, CorpusSplits]:
+        """
+        Cette pipeline permet de :
+        1. Télécharger et extraire un fichier compressé contenant un texte tokenisé.
+        2. Construire trois corpus distincts à partir de ce fichier: TRAIN, DEV, TEST
+
+        Retourne :
+        - La pipeline configurée.
+        - Un dictionnaire contenant les chemins des fichiers de sortie.
+        """
+
+        train_file = f"{folder_base_path}/{file_name_prefix}_train_{format_k(nb_lines_for_train_corpus)}.{code}"
+        dev_file = f"{folder_base_path}/{file_name_prefix}_dev_{format_k(nb_lines_for_dev_corpus)}.{code}"
+        test_file = f"{folder_base_path}/{file_name_prefix}_test_{format_k(nb_lines_for_test_corpus)}.{code}"
+
+        pipeline = Pipeline().add_command_from_factory(
+            # ************************* A partir du "gros" ficher, on crée les corpus TRAIN, DEV, TEST
+            PipelineFactory.corpus_cmd_factory,
+            CommandType.CORPUS_SPLITTING_INTO_TRAIN_DEV_TEST_CORPUSES,
+            # ****** Commun à tous
+            corpus_path=corpus_file_path,
+
+            # Corpus train
+            nb_lines_to_extract_for_train_corpus=nb_lines_for_train_corpus,  # Nombre de lignes à extraire pour le corpus d'entraînement
+            output_file_for_train_corpus=train_file,  # Fichier de sortie pour l'entraînement
+            
+            # Corpus dev
+            starting_point_dev=nb_lines_for_train_corpus+1,
+            nb_lines_to_extract_for_dev_corpus=nb_lines_for_dev_corpus,  # Nombre de lignes pour le corpus de validation
+            output_file_for_dev_corpus=dev_file,  # Fichier de sortie pour la validation
+            
+            # Corpus test
+            starting_point_test=nb_lines_for_train_corpus+nb_lines_for_dev_corpus+1,
+            nb_lines_to_extract_for_test_corpus=nb_lines_for_test_corpus,  # Nombre de lignes pour le corpus de test
+            output_file_for_test_corpus=test_file,  # Fichier de sortie pour le test
+            exclude_file=dev_file  # Fichier à exclure (corpus dev) pour le test
+        )
+        
+        return pipeline, {
+            "train": train_file,
+            "dev": dev_file,
+            "test": test_file
+        }
+
+
+    @staticmethod
+    def build_all_corpora_by_splitting(
+        # fichier à partir du quel, on crée les corpus
+        corpus_file_path: str,
+        language_codes: List[str],
+        # Pour la création des noms de fichiers
+        folder_base_path: str,
+        file_name_prefix: str,
+        # Pour la découpe
+        nb_lines_for_train_corpus: int = 10000,
+        nb_lines_for_dev_corpus: int = 1000,
+        nb_lines_for_test_corpus: int = 500
+    ) -> Tuple[Pipeline, CorpusFilesByLang]:
+
+        """
+        [PIPELINE I.2]
+        /!\ Cette méthode travaille sur les les corpus tokensiés. Par exmeple, pour 'en', j'ai train.tok, test.tok, dev.tok
+        """
+
+        pipeline = Pipeline()
+
+        corpus_files_by_lang = {}
+
+        for lang_code in language_codes:
+            # Construit des corpus TRAIN, DEV, TEST
+            split_file_into_corpora_pipeline, split_files_names = PipelineFactory.split_corpus_into_train_dev_test(
+                corpus_file_path=f"{corpus_file_path}.{lang_code}",
+                folder_base_path=folder_base_path,
+                file_name_prefix=file_name_prefix,
+                code=lang_code,
+                nb_lines_for_train_corpus=nb_lines_for_train_corpus,
+                nb_lines_for_dev_corpus=nb_lines_for_dev_corpus,
+                nb_lines_for_test_corpus=nb_lines_for_test_corpus
+            )
+            pipeline.add_command(split_file_into_corpora_pipeline)
+            corpus_files_by_lang[lang_code] = split_files_names
+
+        return pipeline, corpus_files_by_lang
+    
     # tokenisation
 
     @staticmethod
@@ -84,65 +183,6 @@ class PipelineFactory:
             tokenized_files_by_lang[lang_code] = tokenized_files_names
 
         return pipeline, tokenized_files_by_lang
-
-    # TODO
-
-    @staticmethod
-    def split_tokenized_corpus_into_train_dev_test(
-        folder_base_path: str,
-        file_name_prefix: str,
-        code: str,
-        nb_lines_for_train_corpus: int = 10000,
-        nb_lines_for_dev_corpus: int = 1000,
-        nb_lines_for_test_corpus: int = 500
-    ) -> Tuple[Pipeline, dict]:
-        """
-        Cette pipeline permet de :
-        1. Télécharger et extraire un fichier compressé contenant un texte tokenisé.
-        2. Construire trois corpus distincts à partir de ce fichier: TRAIN, DEV, TEST
-
-        Retourne :
-        - La pipeline configurée.
-        - Un dictionnaire contenant les chemins des fichiers de sortie.
-        """
-
-        train_file = f"{folder_base_path}/{file_name_prefix}_train_{format_k(nb_lines_for_train_corpus)}.tok.{code}"
-        dev_file = f"{folder_base_path}/{file_name_prefix}_dev_{format_k(nb_lines_for_dev_corpus)}.tok.{code}"
-        test_file = f"{folder_base_path}/{file_name_prefix}_test_{format_k(nb_lines_for_test_corpus)}.tok.{code}"
-
-        pipeline = Pipeline().add_command_from_factory(
-            # Téléchargement des données tokenisés en anglais (=> on a le fichier en.tok)
-            PipelineFactory.data_gathering_cmd_factory,
-            CommandType.DOWNLOAD_AND_EXTRACT_FROM_ZIP,
-            url=f"https://object.pouta.csc.fi/OPUS-Europarl/v8/mono/{code}.tok.gz", dest_dir=folder_base_path
-        ).add_command_from_factory(
-            # ************************* On a obtenu deux fichiers tokenisés pour chacun d'entre eux, on crée les corpus TRAIN, DEV, TEST
-            PipelineFactory.corpus_cmd_factory,
-            CommandType.CORPUS_SPLITTING_INTO_TRAIN_DEV_TEST_CORPUSES,
-            # ****** Commun à tous
-            tokenized_corpus_path=f"{folder_base_path}/{code}.tok",
-
-            # Corpus train
-            nb_lines_to_extract_for_train_corpus=nb_lines_for_train_corpus,  # Nombre de lignes à extraire pour le corpus d'entraînement
-            output_file_for_train_corpus=train_file,  # Fichier de sortie pour l'entraînement
-            
-            # Corpus dev
-            starting_point_dev=nb_lines_for_train_corpus+1,
-            nb_lines_to_extract_for_dev_corpus=nb_lines_for_dev_corpus,  # Nombre de lignes pour le corpus de validation
-            output_file_for_dev_corpus=dev_file,  # Fichier de sortie pour la validation
-            
-            # Corpus test
-            starting_point_test=nb_lines_for_train_corpus+nb_lines_for_dev_corpus+1,
-            nb_lines_to_extract_for_test_corpus=nb_lines_for_test_corpus,  # Nombre de lignes pour le corpus de test
-            output_file_for_test_corpus=test_file,  # Fichier de sortie pour le test
-            exclude_file=dev_file  # Fichier à exclure (corpus dev) pour le test
-        )
-        
-        return pipeline, {
-            "train": train_file,
-            "dev": dev_file,
-            "test": test_file
-        }
     
     # truecase and cleaning
     
@@ -294,49 +334,14 @@ class PipelineFactory:
         
 
     # ********************* Pipelines spécifiques
-
+    
     @staticmethod
-    def get_pipeline_i1(n_sample: int = 1000) -> Pipeline:
+    def get_pipeline_i1() -> Pipeline:
         """
         [PIPELINE I.1 => Expérimentation]
         """
         pipeline = Pipeline()
 
-        pipeline.add_command_from_factory(
-            # On télécharge les données depuis internet
-            PipelineFactory.data_gathering_cmd_factory,
-            CommandType.DOWNLOAD_AND_EXTRACT_FROM_TAR,
-            url="https://s3.amazonaws.com/opennmt-trainingdata/toy-ende.tar.gz", dest_dir="./data"
-        ).add_command_from_factory(
-            # On crée le fichier YAML
-            PipelineFactory.open_nmt_cmd_factory,
-            CommandType.YAML_CONFIG,
-            config_path="./config/toy-ende.yaml"
-        ).add_command_from_factory(
-            # On construit le vocabulaire
-            PipelineFactory.open_nmt_cmd_factory,
-            CommandType.BUILD_VOCAB,
-            config_path="./config/toy-ende.yaml", n_sample=n_sample
-        ).add_command_from_factory(
-            # On fait l'entraiement
-            PipelineFactory.open_nmt_cmd_factory,
-            CommandType.TRAIN,
-            config_path="./config/toy-ende.yaml"
-        ).add_command_from_factory(
-            # On traduit
-            PipelineFactory.open_nmt_cmd_factory,
-            CommandType.TRANSLATE,
-            model_path = f"./data/toy-ende/run/model_step_{n_sample}.pt",
-            src_path = "./data/toy-ende/src-test.txt",
-            output_path = f"./data/toy-ende/run/pred_{n_sample}.txt"
-        )
-        return pipeline
-    
-    @staticmethod
-    def get_pipeline_i2() -> Pipeline:
-        """
-        [PIPELINE I.1 => Expérimentation]
-        """
         # 0) Ensemble des variables nécessaire pour l'execution de cette pipeline
         folder_base = "./data/provided-corpus/"
         language_codes=["en", "fr"] # Important source à gauche !
@@ -358,17 +363,18 @@ class PipelineFactory:
         }
 
         # II) Tokenisation
-        pipeline, tokenized_corpus_files_by_lang = PipelineFactory.tokenize_all_corpora(
+        tokenize_pipeline, tokenized_corpus_files_by_lang = PipelineFactory.tokenize_all_corpora(
             raw_corpus_files_by_lang=raw_corpus_files_by_lang,
             language_codes=language_codes)
+        pipeline.add_command(tokenize_pipeline)
 
-        
         # II) On prépare les données (en appliquant le true casing et le nettoyage pour les 2 versions (langue source, langue cible)
-        pipeline, clean_truecased_files_names = PipelineFactory.truecase_and_clean_corpora_pipeline(
+        true_case_clean_pipeline, clean_truecased_files_names = PipelineFactory.truecase_and_clean_corpora_pipeline(
             tokenized_corpus_files_by_lang=tokenized_corpus_files_by_lang,
             language_codes=language_codes,
             folder_base_path=folder_base
         )
+        pipeline.add_command(true_case_clean_pipeline)
         
         
         # III) On construit le vocabulaire, on entraine et on traduit
@@ -385,27 +391,95 @@ class PipelineFactory:
 
             
     @staticmethod
-    def standard_pipeline() -> Pipeline:
+    def get_pipeline_i2() -> Pipeline:
+        
+        pipeline = Pipeline()
 
+        # 0) Ensemble des variables nécessaire pour l'execution de cette pipeline
+        folder_base = "./data/partieII"
+        language_codes=["en", "fr"] # Important source à gauche !
+        yaml_config_path="./config/partieII-mix-europarl_emea_en_fr.yaml"
+
+        sources = {
+            "Europarl": {
+                "folder": f"{folder_base}/europarl",
+                "url": "https://object.pouta.csc.fi/OPUS-Europarl/v8/moses/en-fr.txt.zip",
+                "first_file": "Europarl.en-fr.en",
+                "second_file": "Europarl.en-fr.fr",
+                "prefix": "Europarl",
+                "nb_lines_for_train_corpus":100_000,
+                "nb_lines_for_dev_corpus":3750,
+                "nb_lines_for_test_corpus":500
+            },
+            "EMEA": {
+                "folder": f"{folder_base}/emea",
+                "url": "https://object.pouta.csc.fi/OPUS-EMEA/v3/moses/en-fr.txt.zip",
+                "first_file": "EMEA.en-fr.en",
+                "second_file": "EMEA.en-fr.fr",
+                "prefix": "EMEA",
+                "nb_lines_for_train_corpus":10_000,
+                "nb_lines_for_dev_corpus":500,
+                "nb_lines_for_test_corpus":1 # NB: Enfait, ici, le corpus dev deviendra le corpus test, ce paramètre n'importe pas
+            }
+        }
+        
+        # I) Récupérer les fichiers depuis le web, puis crée les corpus TRAIN, DEV et TEST
+
+        for source_name, params in sources.items():
+            first_file_path = f"{params['folder']}/{params['first_file']}"
+        
+            pipeline.add_command_from_factory(
+                PipelineFactory.data_gathering_cmd_factory,
+                CommandType.DOWNLOAD_AND_EXTRACT_FROM_ZIP,
+                url=params["url"],
+                dest_dir=params["folder"],
+                first_file_to_extract=params["first_file"],
+                second_file_to_extract=params["second_file"],
+                output_path=first_file_path # utilisé pour vérifier si au moins un des deux fichiers a déjà été téléchargé
+            )
+            
+            raw_corpus_files_pipeline, raw_corpus_files_by_lang = PipelineFactory.build_all_corpora_by_splitting(
+                corpus_file_path=first_file_path[:-3], # Enlève l'extension ".en", exemple on garde ./../../Europarl.en-fr, la fonction ajoute déjà .lang_code
+                language_codes=language_codes,
+                folder_base_path=params["folder"],
+                file_name_prefix=params["prefix"],
+                nb_lines_for_train_corpus=params["nb_lines_for_train_corpus"],
+                nb_lines_for_dev_corpus=params["nb_lines_for_dev_corpus"],
+                nb_lines_for_test_corpus=params["nb_lines_for_test_corpus"],
+            )
+            pipeline.add_command(raw_corpus_files_pipeline)
+
+            # II) Tokenisation
+            tokenize_pipeline, tokenized_corpus_files_by_lang = PipelineFactory.tokenize_all_corpora(
+                raw_corpus_files_by_lang=raw_corpus_files_by_lang,
+                language_codes=language_codes)
+            pipeline.add_command(tokenize_pipeline)
+
+            
+            # III) On prépare les données (en appliquant le true casing et le nettoyage pour les 2 versions (langue source, langue cible)
+            true_case_clean_pipeline, clean_truecased_files_names = PipelineFactory.truecase_and_clean_corpora_pipeline(
+                tokenized_corpus_files_by_lang=tokenized_corpus_files_by_lang,
+                language_codes=language_codes,
+                folder_base_path=folder_base
+            )
+            pipeline.add_command(true_case_clean_pipeline)
+
+        # IV) TODO A la fin du for, il faut combiner le corpus TRAIN_100k_europarl avec TRAIN_10k_emea 
+        
+        
+        # V) On construit le vocabulaire, on entraine et on traduit
         """
-        pipeline, clean_truecased_files_names = PipelineFactory.truecase_and_clean_corpora_pipeline(
-            folder_base_path="./data/europarl",
-            file_name_prefix="Europarl",
-            language_codes=["en", "fr"]
-        )
-
-
-        cmd2 = PipelineFactory.train_openmt_model_and_translate_pipeline(
-            folder_base_path="./data/europarl",
+        pipeline.add_command(
+            PipelineFactory.train_openmt_model_and_translate_pipeline(
             clean_truecased_files_names=clean_truecased_files_names,
-            language_codes=["en", "fr"],
-            yaml_config_path="./config/europarl_en_fr.yaml"
+            language_codes=language_codes,
+            folder_base_path=folder_base,
+            yaml_config_path=yaml_config_path
+            )
         )
-
-        return Pipeline().add_command(pipeline).add_command(cmd2)
         """
-        pass
-    
+
+        return pipeline
 
 
 # ************************* UTLIS
