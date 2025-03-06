@@ -25,6 +25,11 @@ pip install -r requirements.txt
 
 `NB` : Ne pas oublier d'activer l'envrionnement virtuel à chaque fois que vous travaillez sur le projet.
 
+
+4. Telecharger le dossier suivant 
+https://github.com/ClaudeCoulombe/FrenchLefffLemmatizer/tree/master/french_lefff_lemmatizer/data
+ et le dossier /data mettre dans .venv/lib/python3.9/site-packages/french_lefff_lemmatizer
+
 ## Utilisation
 
 ```bash
