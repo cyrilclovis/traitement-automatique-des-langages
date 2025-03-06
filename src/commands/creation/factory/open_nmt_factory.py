@@ -16,7 +16,7 @@ class OpenNMTCommandFactory(CommandFactory):
             return self.build_config_command(kwargs["config_path"])
 
         elif command_type == CommandType.BUILD_VOCAB:
-            self.check_required_arguments(kwargs, ["config_path", "src_vocab", "tgt_vocab", "n_sample"])
+            self.check_required_arguments(kwargs, ["config_path", "src_vocab", "tgt_vocab"])
 
             if self.pathExists(kwargs["src_vocab"]) and self.pathExists(kwargs["tgt_vocab"]):
                 return self.build_composite_command([
@@ -24,7 +24,12 @@ class OpenNMTCommandFactory(CommandFactory):
                     self.build_already_exists_command("Le vocabulaire cible: " + kwargs["tgt_vocab"]),
                 ])
 
-            return self.build_command(f"onmt_build_vocab -config {kwargs['config_path']} -n_sample {kwargs['n_sample']}")
+            command = f"onmt_build_vocab -config {kwargs['config_path']}"
+    
+            if "n_sample" in kwargs and kwargs["n_sample"] is not None:
+                command += f" -n_sample {kwargs['n_sample']}"
+
+            return self.build_command(command)
 
         
         elif command_type == CommandType.TRAIN:

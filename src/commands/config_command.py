@@ -1,116 +1,117 @@
 import yaml
-from typing import Dict, List
-from src.commands.command import Command
+from typing import Dict, List, Any
 
-class ConfigCommand(Command):
-    
-    required_fields = [
-        # Pour le vocabulaire
-        "src_vocab", "tgt_vocab",
+class ConfigCommand:
+    allowed_fields = {
+        # vocab
+        "src_vocab": str, "tgt_vocab": str,
+        # save param 
+        "save_model": str, "save_data": str, "overwrite": bool,
+        # Training param
+        "save_checkpoint_steps": int, "train_steps": int, "valid_steps": int,
+        # Training conditions (depends on user's PC configuration)
+        "world_size": int, "gpu_ranks": list,
+        # data
+        "data": dict
+    }
 
-        # Pour l'entrainement
-        "save_model", "save_data"
-    ]
 
-
-    def __init__(self, folder_base_path: str, clean_truecased_files_names: dict, language_codes: List[str], config_file_path: str):
-        """Initialisation avec des valeurs par défaut."""
+    def __init__(self, config_file_path: str):
         self.config_file_path = config_file_path
         self.config = {
-            # ****************************** I) Construction du vocabulaire
-            "src_vocab": "",
-            "tgt_vocab": "",
+            "src_vocab": "", "tgt_vocab": "",
             "overwrite": False,
-
-            # Corpus concernés
-            "data": {
-                "corpus_1": {
-                    "path_src": "",
-                    "path_tgt": ""
-                },
-                "valid": {
-                    "path_src": "",
-                    "path_tgt": ""
-                }
-            },
-
-            # ****************************** II) Entrainement du modèle
-            # Utilise un GPU
-            "world_size": 1,
-            "gpu_ranks": [0],
-
-            # Paramètres de sauvegarder et condition d'entrainement et évaluation (model, checkpoint et steps)
-            "save_model": "",
-            "save_data": "",
+            "save_model": "", "save_data": "",
             "save_checkpoint_steps": 500,
-            "train_steps": 1000,
-            "valid_steps": 500,
+            "train_steps": 1000, "valid_steps": 500,
+            "world_size": 1, "gpu_ranks": [0],
+            "data": {}
         }
 
-        self.add_cleaned_corpus_path(clean_truecased_files_names, language_codes).set_all_required_path(folder_base_path)
+
+    # ************ Getters
+    def get_config_file_path(self):
+        """Renvoie le chemin vers le fichier de configuration .yaml"""
+        return self.config_file_path
 
 
-    def set_training_params(self, train_steps: int, valid_steps: int, checkpoint_steps: int):
-        self.config["train_steps"] = train_steps
-        self.config["valid_steps"] = valid_steps
-        self.config["save_checkpoint_steps"] = checkpoint_steps
-        return self
+    def get(self, key: str) -> Any:
+        """Retourne la valeur d'une clé, supporte les clés imbriquées."""
+        keys = key.split(".")
+        if keys[0] not in self.allowed_fields:
+            raise KeyError(f"❌ Clé '{keys[0]}' non autorisée")
+        
+        if len(keys) == 1:
+            return self.config[keys[0]]
+        else:
+            return self._get_nested(self.config, keys)
 
-    def set_gpu_ranks(self, gpu_ranks: List[int]):
-        self.config["gpu_ranks"] = gpu_ranks
-        return self
 
-    def add_cleaned_corpus_path(self, clean_truecased_files_names: dict, language_codes: List[str]):
-        """Ajout les chemins vers les corpus."""
-
-        # Mapping des clés pour correspondre aux bons noms de configuration
-        key_mapping = {
-            "train": "corpus_1",
-            "dev": "valid"
-        }
-
-        # Fonction anonyme pour obtenir la clé correspondante
-        get_mapped_key = lambda key: key_mapping.get(key)
-
-        for key, file_name in clean_truecased_files_names.items():
-            mapped_key = get_mapped_key(key)
-            if mapped_key:  # Ignore "test"
-                self.config["data"][mapped_key] = {
-                    "path_src": f"{file_name}.{language_codes[0]}",
-                    "path_tgt": f"{file_name}.{language_codes[1]}"
-                }
-
-        return self
-
+    def _get_nested(self, d: dict, keys: List[str]) -> Any:
+        """Récupère une valeur dans une structure imbriquée."""
+        for key in keys:
+            d = d.get(key)
+            if d is None:
+                raise KeyError(f"❌ Clé '{'.'.join(keys)}' introuvable")
+        return d
     
-    def set_all_required_path(self, base_path: str):
-        for required_field in ConfigCommand.required_fields:
-            self.config[required_field] += f"{base_path}/run" + self.complete_path(required_field)
+
+    # ************ Setters
+
+    def set(self, values: Dict[str, Any]):
+        """Ajoute ou met à jour des champs si autorisés."""
+        for key, value in values.items():
+            keys = key.split(".")
+            if keys[0] not in self.allowed_fields:
+                raise KeyError(f"❌ Clé '{keys[0]}' non autorisée")
+            
+            if len(keys) == 1:
+                expected_type = self.allowed_fields[keys[0]]
+                if not isinstance(value, expected_type):
+                    raise TypeError(f"❌ Type invalide pour '{key}'. Attendu: {expected_type.__name__}")
+                self.config[keys[0]] = value
+            else:
+                self._set_nested(self.config, keys, value)
         return self
     
-    def complete_path(self, required_field):
-        key_mapping = {
-            "src_vocab": "/vocab.src",
-            "tgt_vocab": "/vocab.tgt",
-            "save_model": "/model",
-            "save_data": "/samples",
-        }
 
-        return key_mapping.get(required_field)
+    def _set_nested(self, d: dict, keys: List[str], value: Any):
+        """Ajoute/modifie une valeur dans une structure imbriquée."""
+        for key in keys[:-1]:
+            d = d.setdefault(key, {})
+        d[keys[-1]] = value
+
+
+    def remove(self, key: str):
+        """Supprime une clé de la configuration, supporte les clés imbriquées."""
+        keys = key.split(".")
+        if keys[0] not in self.allowed_fields:
+            raise KeyError(f"❌ Clé '{keys[0]}' non autorisée")
+        
+        if len(keys) == 1:
+            if keys[0] in self.config:
+                del self.config[keys[0]]
+                print(f"✅ Clé '{key}' supprimée.")
+            else:
+                raise KeyError(f"❌ Clé '{key}' introuvable")
+        else:
+            self._remove_nested(self.config, keys)
     
-    def get_vocab_source_path(self):
-        return self.config["src_vocab"]
-    
-    def get_vocab_target_path(self):
-        return self.config["tgt_vocab"]
 
+    def _remove_nested(self, d: dict, keys: List[str]):
+        """Supprime une clé dans une structure imbriquée."""
+        for key in keys[:-1]:
+            d = d.get(key)
+            if d is None:
+                raise KeyError(f"❌ Clé '{'.'.join(keys)}' introuvable")
+        if keys[-1] in d:
+            del d[keys[-1]]
+            print(f"✅ Clé '{'.'.join(keys)}' supprimée.")
+        else:
+            raise KeyError(f"❌ Clé '{'.'.join(keys)}' introuvable")
 
-    def build(self) -> Dict:
-        """Retourne la configuration finale."""
-        return self.config
 
     def execute(self):
-        """Enregistre la configuration dans un fichier YAML."""
         with open(self.config_file_path, "w") as file:
             yaml.dump(self.config, file, default_flow_style=False)
         print(f"✅ Configuration enregistrée dans {self.config_file_path}")

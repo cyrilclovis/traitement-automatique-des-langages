@@ -288,10 +288,49 @@ class PipelineFactory:
      
         return pipeline, clean_truecased_files_names
     
-    # use openmt    
+    # use openmt
+    # └─> YAML
+    @staticmethod
+    def get_yaml_config(yaml_config_path: str, clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str, train_steps: int, valid_steps:int, save_checkpoint_steps:int, gpu:bool = True) -> ConfigCommand:
+        """Renvoie une commande capable de créeer un fichier yaml utilisé lors de la construction du vocabulaire et de l'entrainement.
+        On renvoie une commande que l'utilisateur peut mettre à jour (avec les fonctions set ou remove). Voyez cela comme un modèle de base"""
+
+        src_lang=language_codes[0]
+        dest_lang=language_codes[1]
+        run_base_path = f"{folder_base_path}/{src_lang}_{dest_lang}/run"
+
+        config_command = ConfigCommand(yaml_config_path).set({
+            # vocab
+            "src_vocab": f"{run_base_path}/vocab.src",
+            "tgt_vocab": f"{run_base_path}/vocab.tgt",
+            # save param
+            "save_model": f"{run_base_path}/model",
+            "save_data": f"{run_base_path}/samples",
+            "overwrite": False,
+            # Training param
+            "train_steps": train_steps,
+            "valid_steps": valid_steps,
+            "save_checkpoint_steps": save_checkpoint_steps,
+            # Training conditions (depends on user's PC configuration)
+            "world_size": 1,
+            "gpu_ranks": [0],
+            # data
+            # └─> corpus_1
+            "data.corpus_1.path_src": f"{clean_truecased_files_names['train']}.{src_lang}",
+            "data.corpus_1.path_tgt": f"{clean_truecased_files_names['train']}.{dest_lang}",
+            # └─> valid
+            "data.valid.path_src": f"{clean_truecased_files_names['dev']}.{src_lang}",
+            "data.valid.path_tgt": f"{clean_truecased_files_names['dev']}.{dest_lang}",
+        })
+
+        if gpu == False:
+            config_command.remove("gpu_ranks")
+
+        return config_command
+
     # └─> build vocab and train model
     @staticmethod
-    def build_vocab_and_train_model(clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str, yaml_config_path: str, n_sample) -> Tuple[Pipeline, ModelPathsInfo]:
+    def build_vocab_and_train_model(yaml_config: ConfigCommand, language_codes: List[str], folder_base_path: str, n_sample:int=None) -> Tuple[Pipeline, ModelPathsInfo]:
         """
         [PIPELINE I.2 - BUILD_VOCAB & TRAIN]
         """
@@ -299,23 +338,19 @@ class PipelineFactory:
         dest_lang = language_codes[1]
 
         folder_base_path += f"/{src_lang}_{dest_lang}"
-        model_path=f"{folder_base_path}/run/model_step_{n_sample}.pt" # Chemin vers le modèle
+        yaml_config_path = yaml_config.get_config_file_path()
+        model_path = f"{folder_base_path}/run/model_step_{yaml_config.get('train_steps')}.pt"  # Chemin vers le modèle
 
-        config_command = ConfigCommand(folder_base_path, clean_truecased_files_names, language_codes, yaml_config_path)
+        pipeline = Pipeline()
 
-        pipeline =  Pipeline()
-
-        pipeline.add_command(
-            # On crée le fichier YAML
-            config_command
-        ).add_command_from_factory(
+        pipeline.add_command_from_factory(
             # On construit le vocabulaire
             PipelineFactory.open_nmt_cmd_factory,
             CommandType.BUILD_VOCAB,
             config_path=yaml_config_path,
-            src_vocab=config_command.get_vocab_source_path(),
-            tgt_vocab=config_command.get_vocab_target_path(),
-            n_sample=n_sample
+            src_vocab=yaml_config.get("src_vocab"),
+            tgt_vocab=yaml_config.get("tgt_vocab"),
+            **({"n_sample": n_sample} if n_sample is not None else {})
         ).add_command_from_factory(
             # On fait l'entraiement
             PipelineFactory.open_nmt_cmd_factory,
@@ -333,14 +368,14 @@ class PipelineFactory:
         
     # └─> translation and evaluation
     @staticmethod
-    def translate_and_evaluate(clean_truecased_files_names: CorpusSplits, model_paths_info: ModelPathsInfo, n_sample=1000) -> Pipeline:
+    def translate_and_evaluate(clean_truecased_files_names: CorpusSplits, model_paths_info: ModelPathsInfo, n_sample:int=None) -> Pipeline:
         """
         [PIPELINE I.2 - TRANSLATE & BLEU_SCORE]
         """
 
         source_translation_file = f"{clean_truecased_files_names['test']}.{model_paths_info['src_lang']}"        # (Attention, c'est la source !) => A partir de cela, on traduit
         reference_translation_file = f"{clean_truecased_files_names['test']}.{model_paths_info['dest_lang']}"    # (Attention, c'est la destination !) => On compare la traduction du modele avec ce fichier
-        model_translation = f"{model_paths_info['folder_base_path']}/run/pred_{n_sample}.txt"
+        model_translation = f"{model_paths_info['folder_base_path']}/run/pred_{n_sample if n_sample is not None else 'all'}.txt"
 
         pipeline = Pipeline()
 
@@ -362,7 +397,7 @@ class PipelineFactory:
         return pipeline
     
     @staticmethod
-    def build_train_translate_evaluate_pipeline(clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str,  yaml_config_path: str, n_sample = 1000, get_model_paths_info: bool = False) -> Union[Pipeline, Tuple[Pipeline, ModelPathsInfo]]:
+    def build_train_translate_evaluate_pipeline(yaml_config: ConfigCommand, clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str, n_sample:int=None, get_model_paths_info: bool = False) -> Union[Pipeline, Tuple[Pipeline, ModelPathsInfo]]:
         """
         [PIPELINE I.2]
         """
@@ -370,11 +405,11 @@ class PipelineFactory:
 
         # Constructin du vocabulaire et entrainement
         build_and_train_pipeline, models_paths_info = PipelineFactory.build_vocab_and_train_model(
-            clean_truecased_files_names=clean_truecased_files_names,
+            yaml_config=yaml_config,
             language_codes=language_codes,
             folder_base_path=folder_base_path,
-            yaml_config_path=yaml_config_path,
-            n_sample=n_sample
+            **({"n_sample": n_sample} if n_sample is not None else {})
+
         )
         pipeline.add_command(build_and_train_pipeline)
         
@@ -383,7 +418,7 @@ class PipelineFactory:
             PipelineFactory.translate_and_evaluate(
                 clean_truecased_files_names=clean_truecased_files_names,
                 model_paths_info=models_paths_info,
-                n_sample=n_sample
+                **({"n_sample": n_sample} if n_sample is not None else {})
             )
         )
 
@@ -437,12 +472,23 @@ class PipelineFactory:
         
         
         # III) On construit le vocabulaire, on entraine et on traduit
-        pipeline.add_command(
-            PipelineFactory.build_train_translate_evaluate_pipeline(
+        # Pour YAML
+        config_command = PipelineFactory.get_yaml_config(
+            yaml_config_path=yaml_config_path,
             clean_truecased_files_names=clean_truecased_files_names,
             language_codes=language_codes,
             folder_base_path=folder_base,
-            yaml_config_path=yaml_config_path
+            train_steps= 5,
+            valid_steps= 1,
+            save_checkpoint_steps= 4,
+        )
+
+        pipeline.add_command(config_command).add_command(
+            PipelineFactory.build_train_translate_evaluate_pipeline(
+                yaml_config=config_command,
+                clean_truecased_files_names=clean_truecased_files_names,
+                language_codes=language_codes,
+                folder_base_path=folder_base,
             )
         )
 
@@ -457,7 +503,7 @@ class PipelineFactory:
         # 0) Ensemble des variables nécessaire pour l'execution de cette pipeline
         folder_base = "./data/partieII"
         language_codes=["en", "fr"] # Important source à gauche !
-        yaml_config_path="./config/partieII-mix-europarl_emea_en_fr.yaml"
+        yaml_config_path="./config/partieII-europarl_en_fr.yaml"
 
         sources = {
             "Europarl": {
@@ -495,7 +541,7 @@ class PipelineFactory:
                 dest_dir=params["folder"],
                 first_file_to_extract=params["first_file"],
                 second_file_to_extract=params["second_file"],
-                output_path=first_file_path # utilisé pour vérifier si au moins un des deux fichiers a déjà été téléchargé
+                output_path=first_file_path # utilisé pour vérifier si au moins un des deux fichiers a déjà été téléchargé (et donc ne pas re-télécharger)
             )
             
             raw_corpus_files_pipeline, raw_corpus_files_by_lang = PipelineFactory.build_all_corpora_by_splitting(
@@ -534,28 +580,35 @@ class PipelineFactory:
 
         ######################################## RUN 1
 
-        pipeline.add_command(
-            PipelineFactory.corpus_cmd_factory.build_already_exists_command(f"IMPORTANT: {clean_truecased_files_names}")
-        )
-        
-        train_translate_evaluate_pipeline, model_paths_info = PipelineFactory.build_train_translate_evaluate_pipeline(
+        # Pour YAML
+        config_command = PipelineFactory.get_yaml_config(
+            yaml_config_path=yaml_config_path,
             clean_truecased_files_names=clean_truecased_files_names_by_source["Europarl"],
             language_codes=language_codes,
             folder_base_path=folder_base,
-            yaml_config_path=yaml_config_path,
+            train_steps= 5,
+            valid_steps= 1,
+            save_checkpoint_steps= 4,
+        )
+
+        pipeline.add_command(config_command)
+        
+        train_translate_evaluate_pipeline, model_paths_info = PipelineFactory.build_train_translate_evaluate_pipeline(
+            yaml_config=config_command,
+            clean_truecased_files_names=clean_truecased_files_names_by_source["Europarl"],
+            language_codes=language_codes,
+            folder_base_path=folder_base,
             get_model_paths_info = True
         )
 
         # Evaluation:
-        clean_truecased_files_names_by_source["Europarl"]["test"] = clean_truecased_files_names_by_source["EMEA"]["test"] # Pour l'évaluation 1.2, hors domaine
-
         pipeline.add_command(
             # dont évaluation 1.1 => c'est à dire avec le domaine "classique"
             train_translate_evaluate_pipeline
         ).add_command(
             # évaluation 1.2 => c'est à dire hors domaine (on utilise EMEA)
             PipelineFactory.translate_and_evaluate(
-                clean_truecased_files_names=clean_truecased_files_names_by_source["Europarl"],
+                clean_truecased_files_names=clean_truecased_files_names_by_source["EMEA"],
                 model_paths_info=model_paths_info,
             )
         )
