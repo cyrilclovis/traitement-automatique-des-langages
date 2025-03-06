@@ -7,7 +7,7 @@
     # truecase and cleaning
     # use openmt
 
-from typing import List, Dict, TypedDict, Tuple
+from typing import List, Dict, TypedDict, Tuple, Union
 
 from src.pipelines.pipeline import Pipeline
 from src.enums.command_enum import CommandType
@@ -28,6 +28,14 @@ class CorpusSplits(TypedDict):
 
 CorpusFilesByLang = Dict[str, CorpusSplits]  # Par exemple {"en": CorpusSplits, "fr": CorpusSplits}
 
+class ModelPathsInfo(TypedDict):
+    """
+    Structure pour stocker les chemins relatifs à un modèle de traduction.
+    """
+    folder_base_path: str  # Dossier dans lequel on trouve le modèle entrainé (ou dans une de ses sous-hierarchie)
+    model_path: str        # Chemin vers le modèle entrainé 
+    src_lang: str
+    dest_lang: str
 
 class PipelineFactory:
 
@@ -97,7 +105,6 @@ class PipelineFactory:
             "dev": dev_file,
             "test": test_file
         }
-
 
     @staticmethod
     def build_all_corpora_by_splitting(
@@ -281,25 +288,24 @@ class PipelineFactory:
      
         return pipeline, clean_truecased_files_names
     
-    # use openmt
-    
+    # use openmt    
+    # └─> build vocab and train model
     @staticmethod
-    def train_openmt_model_and_translate_pipeline(clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str,  yaml_config_path: str, n_sample = 1000) -> Pipeline:
+    def build_vocab_and_train_model(clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str, yaml_config_path: str, n_sample) -> Tuple[Pipeline, ModelPathsInfo]:
         """
-        [PIPELINE I.2]
+        [PIPELINE I.2 - BUILD_VOCAB & TRAIN]
         """
         src_lang = language_codes[0]
         dest_lang = language_codes[1]
-        folder_base_path += f"/{src_lang}_{language_codes[1]}"
 
-        model_path = f"{folder_base_path}/run/model_step_{n_sample}.pt" # Chemin vers le modèle
-        source_translation_file = f"{clean_truecased_files_names['test']}.{src_lang}" #  (Attention, c'est la source !) => A partir de cela, on traduit
-        reference_translation_file = f"{clean_truecased_files_names['test']}.{dest_lang}" # (Attention, c'est la destination !) => On compare la traduction du modele avec ce fichier
-        model_translation = f"{folder_base_path}/run/pred_{n_sample}.txt"
+        folder_base_path += f"/{src_lang}_{dest_lang}"
+        model_path=f"{folder_base_path}/run/model_step_{n_sample}.pt" # Chemin vers le modèle
 
         config_command = ConfigCommand(folder_base_path, clean_truecased_files_names, language_codes, yaml_config_path)
 
-        return Pipeline().add_command(
+        pipeline =  Pipeline()
+
+        pipeline.add_command(
             # On crée le fichier YAML
             config_command
         ).add_command_from_factory(
@@ -316,11 +322,33 @@ class PipelineFactory:
             CommandType.TRAIN,
             config_path=yaml_config_path,
             model_path = model_path,
-        ).add_command_from_factory(
+        )
+
+        return pipeline, {
+            "folder_base_path": folder_base_path,
+            "model_path": model_path, # Chemin vers le modèle
+            "src_lang": src_lang,
+            "dest_lang": dest_lang
+        }
+        
+    # └─> translation and evaluation
+    @staticmethod
+    def translate_and_evaluate(clean_truecased_files_names: CorpusSplits, model_paths_info: ModelPathsInfo, n_sample=1000) -> Pipeline:
+        """
+        [PIPELINE I.2 - TRANSLATE & BLEU_SCORE]
+        """
+
+        source_translation_file = f"{clean_truecased_files_names['test']}.{model_paths_info['src_lang']}"        # (Attention, c'est la source !) => A partir de cela, on traduit
+        reference_translation_file = f"{clean_truecased_files_names['test']}.{model_paths_info['dest_lang']}"    # (Attention, c'est la destination !) => On compare la traduction du modele avec ce fichier
+        model_translation = f"{model_paths_info['folder_base_path']}/run/pred_{n_sample}.txt"
+
+        pipeline = Pipeline()
+
+        pipeline.add_command_from_factory(
             # On traduit
             PipelineFactory.open_nmt_cmd_factory,
             CommandType.TRANSLATE,
-            model_path = model_path,
+            model_path = model_paths_info["model_path"],
             src_path = source_translation_file,
             output_path = model_translation
         ).add_command_from_factory(
@@ -330,9 +358,40 @@ class PipelineFactory:
             reference_file=reference_translation_file,
             translation_file=model_translation
         )
-        
-        
 
+        return pipeline
+    
+    @staticmethod
+    def build_train_translate_evaluate_pipeline(clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str,  yaml_config_path: str, n_sample = 1000, get_model_paths_info: bool = False) -> Union[Pipeline, Tuple[Pipeline, ModelPathsInfo]]:
+        """
+        [PIPELINE I.2]
+        """
+        pipeline = Pipeline()
+
+        # Constructin du vocabulaire et entrainement
+        build_and_train_pipeline, models_paths_info = PipelineFactory.build_vocab_and_train_model(
+            clean_truecased_files_names=clean_truecased_files_names,
+            language_codes=language_codes,
+            folder_base_path=folder_base_path,
+            yaml_config_path=yaml_config_path,
+            n_sample=n_sample
+        )
+        pipeline.add_command(build_and_train_pipeline)
+        
+        # Traduction et évaluation
+        pipeline.add_command(
+            PipelineFactory.translate_and_evaluate(
+                clean_truecased_files_names=clean_truecased_files_names,
+                model_paths_info=models_paths_info,
+                n_sample=n_sample
+            )
+        )
+
+        if get_model_paths_info:
+            return pipeline, models_paths_info
+        return pipeline
+    
+    
     # ********************* Pipelines spécifiques
     
     @staticmethod
@@ -379,7 +438,7 @@ class PipelineFactory:
         
         # III) On construit le vocabulaire, on entraine et on traduit
         pipeline.add_command(
-            PipelineFactory.train_openmt_model_and_translate_pipeline(
+            PipelineFactory.build_train_translate_evaluate_pipeline(
             clean_truecased_files_names=clean_truecased_files_names,
             language_codes=language_codes,
             folder_base_path=folder_base,
@@ -418,13 +477,14 @@ class PipelineFactory:
                 "second_file": "EMEA.en-fr.fr",
                 "prefix": "EMEA",
                 "nb_lines_for_train_corpus":10_000,
-                "nb_lines_for_dev_corpus":500,
-                "nb_lines_for_test_corpus":1 # NB: Enfait, ici, le corpus dev deviendra le corpus test, ce paramètre n'importe pas
+                "nb_lines_for_dev_corpus":0,
+                "nb_lines_for_test_corpus":500
             }
         }
         
         # I) Récupérer les fichiers depuis le web, puis crée les corpus TRAIN, DEV et TEST
-
+        clean_truecased_files_names_by_source = {}
+        
         for source_name, params in sources.items():
             first_file_path = f"{params['folder']}/{params['first_file']}"
         
@@ -439,7 +499,7 @@ class PipelineFactory:
             )
             
             raw_corpus_files_pipeline, raw_corpus_files_by_lang = PipelineFactory.build_all_corpora_by_splitting(
-                corpus_file_path=first_file_path[:-3], # Enlève l'extension ".en", exemple on garde ./../../Europarl.en-fr, la fonction ajoute déjà .lang_code
+                corpus_file_path=first_file_path[:-3], # Enlève l'extension ".en", exemple on garde ./../../Europarl.en-fr, la pipeline ajoute déjà .lang_code
                 language_codes=language_codes,
                 folder_base_path=params["folder"],
                 file_name_prefix=params["prefix"],
@@ -464,20 +524,41 @@ class PipelineFactory:
             )
             pipeline.add_command(true_case_clean_pipeline)
 
-        # IV) TODO A la fin du for, il faut combiner le corpus TRAIN_100k_europarl avec TRAIN_10k_emea 
+            # Ajout des fichiers nettoyés et truecasés dans le dictionnaire avec source_name comme clé
+            clean_truecased_files_names_by_source[source_name] = clean_truecased_files_names
         
-        
-        # V) On construit le vocabulaire, on entraine et on traduit
-        """
+        # IV) On construit le vocabulaire, on entraine et on traduit [UNIQUEMENT POUR EUROPARL]
+        # En effet, on rappelle que toute la partie EMEA existe UNIQUEMENT pour
+        # 1) [RUN 1 et 2] Proposer le corpus test, pour faire la deuxième évaluation en hors-domaine
+        # 2) [RUN 2] Ajouter 10k de ligne au 100k de Europarl
+
+        ######################################## RUN 1
+
         pipeline.add_command(
-            PipelineFactory.train_openmt_model_and_translate_pipeline(
-            clean_truecased_files_names=clean_truecased_files_names,
+            PipelineFactory.corpus_cmd_factory.build_already_exists_command(f"IMPORTANT: {clean_truecased_files_names}")
+        )
+        
+        train_translate_evaluate_pipeline, model_paths_info = PipelineFactory.build_train_translate_evaluate_pipeline(
+            clean_truecased_files_names=clean_truecased_files_names_by_source["Europarl"],
             language_codes=language_codes,
             folder_base_path=folder_base,
-            yaml_config_path=yaml_config_path
+            yaml_config_path=yaml_config_path,
+            get_model_paths_info = True
+        )
+
+        # Evaluation:
+        clean_truecased_files_names_by_source["Europarl"]["test"] = clean_truecased_files_names_by_source["EMEA"]["test"] # Pour l'évaluation 1.2, hors domaine
+
+        pipeline.add_command(
+            # dont évaluation 1.1 => c'est à dire avec le domaine "classique"
+            train_translate_evaluate_pipeline
+        ).add_command(
+            # évaluation 1.2 => c'est à dire hors domaine (on utilise EMEA)
+            PipelineFactory.translate_and_evaluate(
+                clean_truecased_files_names=clean_truecased_files_names_by_source["Europarl"],
+                model_paths_info=model_paths_info,
             )
         )
-        """
 
         return pipeline
 
