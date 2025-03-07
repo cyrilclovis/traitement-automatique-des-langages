@@ -45,6 +45,11 @@ class MosesCommandFactory(CommandFactory):
         
         elif command_type == CommandType.CLEAN_CORPUS:
             self.check_required_arguments(kwargs, ["input_file", "lang1", "lang2", "output_file", "min_len", "max_len"])
+
+            # Vérifie l'existence du fichier de sortie avant de continuer
+            if self.pathExists(f"{kwargs['input_file']}.{kwargs['lang1']}"):
+                return self.build_already_exists_command(f"Les versions nettoyés de {kwargs['lang1']} et {kwargs['lang2']}: {kwargs['output_file']}")
+
             return self.build_command(
                 f"./data/mosesdecoder/scripts/training/clean-corpus-n.perl {kwargs['input_file']} {kwargs['lang1']} {kwargs['lang2']} {kwargs['output_file']} {kwargs['min_len']} {kwargs['max_len']}"
             )

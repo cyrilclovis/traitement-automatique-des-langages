@@ -19,7 +19,7 @@ class CommandType(Enum):
     EXTRACT_FIRST_N_LINES_FROM_STARTING_POINT = "extract_first_n_lines_from_starting_point"
     EXTRACT_N_RANDOM_LINES_FROM_STARTING_POINT = "extract_n_random_lines_from_starting_point"
     EXTRACT_N_RANDOM_LINES_WHICH_ARE_NOT_IN_GIVEN_FILE = "extract_n_random_lines_which_are_not_in_given_file"
-    ADD_N_LINES_FROM_SRC_TO_TARGET_FILE="add_n_lines_from_src_to_target_file"
+    MERGE_FILES_INTO_NEW_FILE="merge_files_into_new_file"
 
     CORPUS_SPLITTING_INTO_TRAIN_DEV_TEST_CORPUSES = "corpus_splitting_into_train_dev_test_corpuses"
 

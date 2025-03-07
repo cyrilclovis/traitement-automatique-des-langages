@@ -30,9 +30,9 @@ class CorpusConstructionCommandFactory(CommandFactory):
             self.check_required_arguments(kwargs, ["starting_point", "file_path", "output_file", "exclude_file", "nb_lines_to_extract"])
             return self.build_command(f"tail -n +{int(kwargs['starting_point'])+1} {kwargs['file_path']} | grep -vxF -f {kwargs['exclude_file']} | shuf -n {kwargs['nb_lines_to_extract']} > {kwargs['output_file']}")
         
-        elif command_type == CommandType.ADD_N_LINES_FROM_SRC_TO_TARGET_FILE:
-            self.check_required_arguments(kwargs, ["src_file", "target_file", "nb_lines_to_add"])
-            return self.build_command(f"head -n {kwargs['nb_lines_to_add']} {kwargs['src_file']} >> {kwargs['target_file']}")
+        elif command_type == CommandType.MERGE_FILES_INTO_NEW_FILE:
+            self.check_required_arguments(kwargs, ["src_file_1", "src_file_2", "output_file"])
+            return self.build_command(f"cat {kwargs['src_file_1']} {kwargs['src_file_2']} > {kwargs['output_file']}")
         # ********************* Commandes composées
 
         elif command_type == CommandType.CORPUS_SPLITTING_INTO_TRAIN_DEV_TEST_CORPUSES:

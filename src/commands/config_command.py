@@ -16,8 +16,9 @@ class ConfigCommand:
     }
 
 
-    def __init__(self, config_file_path: str):
+    def __init__(self, config_file_path: str, run_base_path:str):
         self.config_file_path = config_file_path
+        self.run_base_path = run_base_path
         self.config = {
             "src_vocab": "", "tgt_vocab": "",
             "overwrite": False,
@@ -34,6 +35,9 @@ class ConfigCommand:
         """Renvoie le chemin vers le fichier de configuration .yaml"""
         return self.config_file_path
 
+    def get_run_base_path(self):
+        """Renvoie le chemin vers le dossier run (Il contient tout ce qui concerne l'IA)"""
+        return self.run_base_path
 
     def get(self, key: str) -> Any:
         """Retourne la valeur d'une clé, supporte les clés imbriquées."""
@@ -92,6 +96,7 @@ class ConfigCommand:
             if keys[0] in self.config:
                 del self.config[keys[0]]
                 print(f"✅ Clé '{key}' supprimée.")
+                return self
             else:
                 raise KeyError(f"❌ Clé '{key}' introuvable")
         else:
