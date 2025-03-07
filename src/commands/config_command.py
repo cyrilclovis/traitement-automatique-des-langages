@@ -12,7 +12,9 @@ class ConfigCommand:
         # Training conditions (depends on user's PC configuration)
         "world_size": int, "gpu_ranks": list,
         # data
-        "data": dict
+        "data": dict,
+        # learning rate
+        "learning_rate": float, "optim": str
     }
 
 
@@ -26,7 +28,9 @@ class ConfigCommand:
             "save_checkpoint_steps": 500,
             "train_steps": 1000, "valid_steps": 500,
             "world_size": 1, "gpu_ranks": [0],
-            "data": {}
+            "data": {},
+            "learning_rate": 0.0005,
+            "optim": "adam"
         }
 
 

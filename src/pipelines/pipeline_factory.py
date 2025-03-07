@@ -329,7 +329,7 @@ class PipelineFactory:
         if gpu == False:
             config_command.remove("gpu_ranks")
 
-        return config_command.remove("valid_steps").remove("save_checkpoint_steps") # Plus facile pour le développement
+        return config_command
 
     # └─> build vocab and train model
     @staticmethod
@@ -482,9 +482,9 @@ class PipelineFactory:
             language_codes=language_codes,
             folder_base_path=folder_base,
             run_number= 1, # Pour l'exercice 1, il y a qu'un seul run
-            train_steps= 5,
-            valid_steps= 1,
-            save_checkpoint_steps= 4,
+            train_steps= 10_000,
+            valid_steps= 1_000,
+            save_checkpoint_steps= 1_000,
         )
 
         pipeline.add_command(config_command).add_command(
