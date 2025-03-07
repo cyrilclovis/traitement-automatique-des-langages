@@ -75,5 +75,7 @@ python ./src/utils/install_lefff.py
 ### Lancement
 
 ```bash
-python3 main.py
+python3 main.py [PARTIE]
 ```
+- 📢 Si vous souhaitez obtenir plus d'indications ```python main.py --help```
+- [PARTIE] prend une valeur dans [I, II, III]
