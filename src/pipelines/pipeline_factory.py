@@ -400,7 +400,8 @@ class PipelineFactory:
             "folder_base_path": folder_base_path,
             "model_path": model_path, # Chemin vers le modèle
             "src_lang": src_lang,
-            "dest_lang": dest_lang
+            "dest_lang": dest_lang,
+            "gpu": yaml_config.get('gpu_ranks')[0]
         }
         
     # └─> translation and evaluation
@@ -422,7 +423,8 @@ class PipelineFactory:
             CommandType.TRANSLATE,
             model_path = model_paths_info["model_path"],
             src_path = source_translation_file,
-            output_path = model_translation
+            output_path = model_translation,
+            gpu=model_paths_info["gpu"],
         ).add_command_from_factory(
             # On évalue
             PipelineFactory.open_nmt_cmd_factory,

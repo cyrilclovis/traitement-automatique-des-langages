@@ -41,7 +41,7 @@ class OpenNMTCommandFactory(CommandFactory):
             return self.build_command(f"onmt_train -config {kwargs['config_path']}")
         
         elif command_type == CommandType.TRANSLATE:
-            self.check_required_arguments(kwargs, ["model_path", "src_path", "output_path"])
+            self.check_required_arguments(kwargs, ["model_path", "src_path", "output_path", "gpu"])
 
             # Vérifie l'existence du fichier YAML
             if self.pathExists(kwargs["output_path"]):
