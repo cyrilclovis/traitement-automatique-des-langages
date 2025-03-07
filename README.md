@@ -79,3 +79,17 @@ python3 main.py [PARTIE]
 ```
 - 📢 Si vous souhaitez obtenir plus d'indications ```python main.py --help```
 - [PARTIE] prend une valeur dans [I, II, III]
+
+### ⚠️ Avertissement  
+
+L'exécution peut être longue selon la partie sélectionnée :  
+
+- **Partie I** : environ **30 minutes**  
+- **Partie II** : environ **1 heure**  
+- **Partie III** : environ **1 heure**  
+
+Si vous souhaitez éviter ces temps d'exécution, vous pouvez télécharger directement nos modèles depuis notre Drive :  
+
+📂 **Dossier Drive** : [Modèles et fichiers prétraités](https://drive.google.com/drive/folders/1SzxIGCEj30czfxTmDNlDrmy9w3ZkoNOZ?usp=sharing)  
+
+Après avoir cloné ce projet, il suffit de copier-coller le dossier `data` dans `./traitement-automatique-des-langages/`.
