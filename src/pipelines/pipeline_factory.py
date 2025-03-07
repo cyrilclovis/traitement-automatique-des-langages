@@ -406,14 +406,17 @@ class PipelineFactory:
         
     # └─> translation and evaluation
     @staticmethod
-    def translate_and_evaluate(clean_truecased_files_names: CorpusSplits, model_paths_info: ModelPathsInfo, n_sample:int=-1) -> Pipeline:
+    def translate_and_evaluate(clean_truecased_files_names: CorpusSplits, model_paths_info: ModelPathsInfo, run_number: int = None, n_sample:int=-1) -> Pipeline:
         """
         [PIPELINE I.2 - TRANSLATE & BLEU_SCORE]
         """
 
         source_translation_file = f"{clean_truecased_files_names['test']}.{model_paths_info['src_lang']}"        # (Attention, c'est la source !) => A partir de cela, on traduit
         reference_translation_file = f"{clean_truecased_files_names['test']}.{model_paths_info['dest_lang']}"    # (Attention, c'est la destination !) => On compare la traduction du modele avec ce fichier
-        model_translation = f"{model_paths_info['folder_base_path']}/pred_{n_sample if n_sample is not None else 'all'}.txt"
+        model_translation = f"{model_paths_info['folder_base_path']}/pred_"
+        if run_number != None:
+            model_translation += f"run{run_number}_"
+        model_translation += f"{n_sample if n_sample != -1 else 'all_vocab'}.txt"
 
         pipeline = Pipeline()
 
@@ -436,7 +439,9 @@ class PipelineFactory:
         return pipeline
     
     @staticmethod
-    def build_train_translate_evaluate_pipeline(yaml_config: ConfigCommand, clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str, n_sample:int=-1, get_model_paths_info: bool = False) -> Union[Pipeline, Tuple[Pipeline, ModelPathsInfo]]:
+    def build_train_translate_evaluate_pipeline(yaml_config: ConfigCommand, clean_truecased_files_names: CorpusSplits, language_codes: List[str], folder_base_path: str,
+                                                            run_number: int = None, n_sample:int=-1, get_model_paths_info: bool = False
+                                                            ) ->Union[Pipeline, Tuple[Pipeline, ModelPathsInfo]]:
         """
         [PIPELINE I.2]
         """
@@ -457,6 +462,7 @@ class PipelineFactory:
             PipelineFactory.translate_and_evaluate(
                 clean_truecased_files_names=clean_truecased_files_names,
                 model_paths_info=models_paths_info,
+                run_number=run_number,
                 **({"n_sample": n_sample} if n_sample is not None else {})
             )
         )
@@ -622,6 +628,7 @@ class PipelineFactory:
         # 2) [RUN 2] Ajouter 10k de ligne au 100k de Europarl
 
         ######################################## RUN 1
+        run_number=1
 
         # Pour YAML
         config_command = PipelineFactory.get_yaml_config(
@@ -629,7 +636,7 @@ class PipelineFactory:
             clean_truecased_files_names=clean_truecased_files_names_by_source["Europarl"],
             language_codes=language_codes,
             folder_base_path=folder_base,
-            run_number=1,
+            run_number=run_number,
             train_steps= 10_000,
             valid_steps= 1_000,
             save_checkpoint_steps= 1_000,
@@ -642,6 +649,7 @@ class PipelineFactory:
             clean_truecased_files_names=clean_truecased_files_names_by_source["Europarl"],
             language_codes=language_codes,
             folder_base_path=folder_base,
+            run_number=run_number,
             get_model_paths_info = True
         )
 
@@ -698,6 +706,7 @@ class PipelineFactory:
         # Il reste donc toute la partie openmt (exactement comme dans get_pipeline_i2)
 
         clean_truecased_files_names_by_source_after_run1["Europarl"]["train"] = output_file
+        run_number=2
 
         # Pour YAML
         config_command = PipelineFactory.get_yaml_config(
@@ -705,7 +714,7 @@ class PipelineFactory:
             clean_truecased_files_names=clean_truecased_files_names_by_source_after_run1["Europarl"],
             language_codes=language_codes,
             folder_base_path=folder_base_path, # meme qu'avant, c'est sur ?
-            run_number=2,
+            run_number=run_number,
             train_steps= 10_000,
             valid_steps= 1_000,
             save_checkpoint_steps= 1_000,
@@ -718,6 +727,7 @@ class PipelineFactory:
             clean_truecased_files_names=clean_truecased_files_names_by_source_after_run1["Europarl"],
             language_codes=language_codes,
             folder_base_path=folder_base_path,
+            run_number=run_number,
             get_model_paths_info = True
         )
 
