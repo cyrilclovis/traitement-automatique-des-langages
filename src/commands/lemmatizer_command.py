@@ -1,17 +1,17 @@
-import yaml
 import nltk
-from typing import Dict
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 from nltk.tokenize import word_tokenize
 from french_lefff_lemmatizer.french_lefff_lemmatizer import FrenchLefffLemmatizer
+
+from src.commands.command import Command
 
 # Téléchargement des ressources pour NLTK
 nltk.download('wordnet')
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
 
-class LemmatizerCommand:
+class LemmatizerCommand(Command):
     def __init__(self, lang_code: str, input_file: str, output_file: str):
         """
         Initialise le lemmatizer avec la langue, les fichiers d'entrée et sortie, et le chemin de config.
