@@ -37,6 +37,7 @@ class ConfigCommand(Command):
             # ****************************** II) Entrainement du modèle
             # Utilise un GPU
             "world_size": 1,
+            "gpu_ranks": [0],
 
             # Paramètres de sauvegarder et condition d'entrainement et évaluation (model, checkpoint et steps)
             "save_model": "",
