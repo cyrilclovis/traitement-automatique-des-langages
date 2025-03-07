@@ -4,6 +4,7 @@
 # Faites CTrl + f et rechercher le nom pour voir la pipeline correspondante
     # split file into TRAIN, DEV, TEST corpora
     # tokenisation
+    # lemmatizer
     # truecase and cleaning
     # use openmt
 
@@ -19,6 +20,8 @@ from src.commands.creation.factory.corpus_factory import CorpusConstructionComma
 from src.commands.creation.factory.moses_factory import MosesCommandFactory 
 
 from src.commands.config_command import ConfigCommand
+from src.commands.lemmatizer_command import LemmatizerCommand
+
 
 # Types:
 class CorpusSplits(TypedDict):
@@ -172,7 +175,7 @@ class PipelineFactory:
         return pipeline, tokensized_files_names
 
     @staticmethod
-    def tokenize_all_corpora(raw_corpus_files_by_lang: CorpusFilesByLang, language_codes: List[str]) -> Tuple[Pipeline, CorpusFilesByLang]:
+    def tokenize_all_corpora(raw_corpus_files_by_lang: CorpusFilesByLang, language_codes: List[str], useLemmatizer:bool=False) -> Tuple[Pipeline, CorpusFilesByLang]:
 
         """
         [PIPELINE I.2]
@@ -189,8 +192,39 @@ class PipelineFactory:
             pipeline.add_command(tokenize_pipeline)
             tokenized_files_by_lang[lang_code] = tokenized_files_names
 
+            # Lemmatize les fichiers pour une langue
+            if useLemmatizer:
+                lemmatize_pipeline, lemmatized_files_names = PipelineFactory.lemmatize_all_files(tokenized_files_by_lang[lang_code], lang_code)
+                pipeline.add_command(lemmatize_pipeline)
+                tokenized_files_by_lang[lang_code] = lemmatized_files_names
+
         return pipeline, tokenized_files_by_lang
     
+    # lemmatizer
+
+    @staticmethod
+    def lemmatize_all_files(tokenized_corpus_splits: CorpusSplits, lang_code: str) -> Tuple[Pipeline, CorpusSplits]:
+        
+        pipeline = Pipeline()
+
+        # Génére les noms des fichiers tokenisés
+        lemmatized_files_names: CorpusSplits = {
+            split: insert_before_extension(tokenized_corpus_splits[split], ".lem", lang_code)
+            for split in ["train", "dev", "test"]
+        }
+
+        # Ajoute les commandes au pipeline
+        for split, output_file in lemmatized_files_names.items():
+            pipeline.add_command(
+                LemmatizerCommand(
+                    lang_code=lang_code,
+                    input_file=tokenized_corpus_splits[split],
+                    output_file=output_file
+                )
+            )
+
+        return pipeline, lemmatized_files_names
+
     # truecase and cleaning
     
     @staticmethod
@@ -500,7 +534,7 @@ class PipelineFactory:
 
             
     @staticmethod
-    def get_pipeline_i2_run1(folder_base: str, language_codes:List[str], yaml_config_path_run1:str) -> Tuple[Pipeline, dict[str, dict], dict]:
+    def get_pipeline_i2_run1(folder_base: str, language_codes:List[str], yaml_config_path_run1:str, useLemmatizer:bool) -> Tuple[Pipeline, dict[str, dict], dict]:
         """language_codes=["en", "fr"] # Important source à gauche !"""
         
         pipeline = Pipeline()
@@ -562,7 +596,9 @@ class PipelineFactory:
             # II) Tokenisation
             tokenize_pipeline, tokenized_corpus_files_by_lang = PipelineFactory.tokenize_all_corpora(
                 raw_corpus_files_by_lang=raw_corpus_files_by_lang,
-                language_codes=language_codes)
+                language_codes=language_codes,
+                useLemmatizer=useLemmatizer
+                )
             pipeline.add_command(tokenize_pipeline)
 
             
@@ -622,7 +658,7 @@ class PipelineFactory:
         return pipeline, sources, clean_truecased_files_names_by_source
 
     @staticmethod
-    def get_i2_all_run(folder_base_path: str, language_codes:List[str], yaml_config_path_run1:str, yaml_config_path_run2:str) -> Pipeline:
+    def get_i2_all_run(folder_base_path: str, language_codes:List[str], yaml_config_path_run1:str, yaml_config_path_run2:str, useLemmatizer:bool=False) -> Pipeline:
         """Met en place les runs 1 et 2 de la partie II. Le run1 et run2, s'appuie sur les memes corpus (un détail, pour run2, on ajoute les 10k
         de ligne de train EMEA au 100k de train Europarl)
         """
@@ -632,7 +668,8 @@ class PipelineFactory:
         pipeline_run1, sources, clean_truecased_files_names_by_source_after_run1 = PipelineFactory.get_pipeline_i2_run1(
             folder_base=folder_base_path,
             language_codes=language_codes,
-            yaml_config_path_run1=yaml_config_path_run1
+            yaml_config_path_run1=yaml_config_path_run1,
+            useLemmatizer=useLemmatizer
         )
         pipeline.add_command(pipeline_run1)
 
