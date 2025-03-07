@@ -169,3 +169,22 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+### From now on, this only concerns our project
+
+# Remove them just before the submission
+config/
+data/
+
+# Provided corpus (given with the project)
+!data/provided-corpus/Europarl_dev_1k.en
+!data/provided-corpus/Europarl_dev_1k.fr
+
+!data/provided-corpus/Europarl_test_500.en
+!data/provided-corpus/Europarl_test_500.fr
+
+!data/provided-corpus/Europarl_train_10k.en
+!data/provided-corpus/Europarl_train_10k.fr
+
+# Provided code
+!data/multi_bleu.pl
