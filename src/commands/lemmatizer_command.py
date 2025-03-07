@@ -5,11 +5,15 @@ from nltk.tokenize import word_tokenize
 from french_lefff_lemmatizer.french_lefff_lemmatizer import FrenchLefffLemmatizer
 
 from src.commands.command import Command
+from src.utils.helpers import pathExists
+from src.commands.creation.command_builder import CommandBuilder
 
 # Téléchargement des ressources pour NLTK
 nltk.download('wordnet')
 nltk.download('punkt')
+nltk.download('punkt_tab')
 nltk.download('averaged_perceptron_tagger')
+nltk.download('averaged_perceptron_tagger_eng')
 
 class LemmatizerCommand(Command):
     def __init__(self, lang_code: str, input_file: str, output_file: str):
@@ -19,6 +23,10 @@ class LemmatizerCommand(Command):
         self.lang_code = lang_code
         self.input_file = input_file
         self.output_file = output_file
+
+        self.file_already_exists = False
+        if pathExists(output_file):
+            self.file_already_exists = True
 
         # Sélection du lemmatizer
         if lang_code == "en":
@@ -63,7 +71,9 @@ class LemmatizerCommand(Command):
         """
         Exécute la lemmatisation et sauvegarde la configuration.
         """
-        self.lemmatize_corpus()
+        if self.file_already_exists:
+            return CommandBuilder.build_command(f"echo \"📢 {self.output_file} existe déjà.\"").execute()
+        return self.lemmatize_corpus()
 
 
 if __name__ == "__main__":

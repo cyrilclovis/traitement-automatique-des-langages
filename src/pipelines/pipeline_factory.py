@@ -350,7 +350,7 @@ class PipelineFactory:
             "save_checkpoint_steps": save_checkpoint_steps,
             # Training conditions (depends on user's PC configuration)
             "world_size": 1,
-            "gpu_ranks": [1],
+            "gpu_ranks": [0],
             # data
             # └─> corpus_1
             "data.corpus_1.path_src": f"{clean_truecased_files_names['train']}.{src_lang}",
