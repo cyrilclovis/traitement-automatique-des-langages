@@ -592,9 +592,9 @@ class PipelineFactory:
             language_codes=language_codes,
             folder_base_path=folder_base,
             run_number=1,
-            train_steps= 5,
-            valid_steps= 1,
-            save_checkpoint_steps= 4,
+            train_steps= 10_000,
+            valid_steps= 1_000,
+            save_checkpoint_steps= 1_000,
         )
 
         pipeline.add_command(config_command)
@@ -667,9 +667,9 @@ class PipelineFactory:
             language_codes=language_codes,
             folder_base_path=folder_base_path, # meme qu'avant, c'est sur ?
             run_number=2,
-            train_steps= 5,
-            valid_steps= 1,
-            save_checkpoint_steps= 4,
+            train_steps= 10_000,
+            valid_steps= 1_000,
+            save_checkpoint_steps= 1_000,
         )
 
         pipeline.add_command(config_command)
